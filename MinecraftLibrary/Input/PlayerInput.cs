@@ -1,4 +1,6 @@
-﻿namespace MinecraftLibrary.Input;
+﻿using MinecraftLibrary.Network;
+
+namespace MinecraftLibrary.Input;
 
 public struct PlayerInput
 {
@@ -96,5 +98,21 @@ public struct PlayerInput
         KeySet2Hold = input.KeySet2;
         KeySet1Pressed = (byte)(KeySet1Hold & ~prevKeySet1Hold);
         KeySet2Pressed = (byte)(KeySet2Hold & ~prevKeySet2Hold);
+    }
+    
+    public void Serialize(Packet packet)
+    {
+        packet.Write(MouseX);
+        packet.Write(MouseY);
+        packet.Write(KeySet1Pressed);
+        packet.Write(KeySet2Pressed);
+    }
+
+    public void Deserialize(Packet packet)
+    {
+        packet.Read(out MouseX);
+        packet.Read(out MouseY);
+        packet.Read(out KeySet1Pressed);
+        packet.Read(out KeySet2Pressed);
     }
 }

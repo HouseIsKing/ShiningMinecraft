@@ -1,15 +1,16 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using MinecraftLibrary.Engine.Blocks;
 using MinecraftLibrary.Input;
+using OpenTK.Mathematics;
 
 namespace MinecraftLibrary.Engine;
 
 public static class EngineDefaults
 {
-
-    public static readonly int ChunkHeight = 16;
-    public static readonly int ChunkWidth = 16;
-    public static readonly int ChunkDepth = 16;
+    public const int ChunkHeight = 16;
+    public const int ChunkWidth = 16;
+    public const int ChunkDepth = 16;
 
     public static readonly Block[] Blocks = new Block[]
     {
@@ -49,4 +50,35 @@ public static class EngineDefaults
             Marshal.FreeHGlobal(ptr);
         }
     }
+    
+    public static long NanoTime() {
+        var nano = 10000L * Stopwatch.GetTimestamp();
+        nano /= TimeSpan.TicksPerMillisecond;
+        nano *= 100L;
+        return nano;
+    }
+    
+    public static Box3 Expand(Box3 box, Vector3 vector)
+    {
+        var min = box.Min;
+        var max = box.Max;
+        if (vector.X < 0)
+            min.X += vector.X;
+        else
+            max.X += vector.X;
+        if (vector.Y < 0)
+            min.Y += vector.Y;
+        else
+            max.Y += vector.Y;
+        if (vector.Z < 0)
+            min.Z += vector.Z;
+        else
+            max.Z += vector.Z;
+        return new Box3(min, max);
+    }
+    public delegate void ChunkUpdateHandler(Vector3i chunkPosition);
+
+    public delegate void LightUpdateHandler(Vector2i lightPosition);
+
+    public delegate void EntityUpdateHandler(ushort entityId);
 }

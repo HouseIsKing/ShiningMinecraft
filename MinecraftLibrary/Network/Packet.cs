@@ -80,6 +80,24 @@ public class Packet
         Write(data.Z);
     }
 
+    public void Write(Vector3 data)
+    {
+        Write(data.X);
+        Write(data.Y);
+        Write(data.Z);
+    }
+
+    public void Write(bool data)
+    {
+        Write(BitConverter.GetBytes(data));
+    }
+    
+    public void Write(Vector2i data)
+    {
+        Write(data.X);
+        Write(data.Y);
+    }
+
     public void Read(out IEnumerable<byte> data, int count)
     {
         data = Data.GetRange(DataPos, count);
@@ -149,5 +167,29 @@ public class Packet
         Read(out data.X);
         Read(out data.Y);
         Read(out data.Z);
+    }
+    
+    public void Read(out Vector3 data)
+    {
+        Read(out data.X);
+        Read(out data.Y);
+        Read(out data.Z);
+    }
+
+    public void Read(out bool data)
+    {
+        Read(out var bytes, sizeof(bool));
+        data = BitConverter.ToBoolean(bytes.ToArray());
+    }
+    
+    public void Read(out Vector2i data)
+    {
+        Read(out data.X);
+        Read(out data.Y);
+    }
+
+    public void Reset()
+    {
+        DataPos = 0;
     }
 }
