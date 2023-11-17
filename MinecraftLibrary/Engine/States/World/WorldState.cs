@@ -1,4 +1,5 @@
-﻿using MinecraftLibrary.Engine.States.Entities;
+﻿using System.IO.Compression;
+using MinecraftLibrary.Engine.States.Entities;
 using MinecraftLibrary.Network;
 using OpenTK.Mathematics;
 
@@ -16,22 +17,36 @@ public sealed class WorldState : State<WorldState>
     private readonly Dictionary<ushort, KeyValuePair<EntityType, object>> _removedEntities = new();
     private readonly HashSet<ushort> _entityUpdates = new();
     private ulong _worldTime = 0;
+    public Random Random { get; }
+
+    public long Seed { get; }
 
     public ulong WorldTime
     {
         get => _worldTime;
-        private set
+        set
         {
             Changes.TryAdd((ushort)StateChange.WorldTime, _worldTime);
             _worldTime = value;
         }
     }
 
-    public long Seed { get; }
-
     public WorldState(long seed)
     {
         Seed = seed;
+        Random = new Random(seed);
+        Random.OnRandomUpdate += OnRandomUpdate;
+        _entityIdToType.EnsureCapacity(ushort.MaxValue);
+        for (var i = ushort.MaxValue; i > 0; i++)
+            _entityIdToType.Add(i, EntityType.Null);
+        _entityIdToType.Add(0, EntityType.Null);
+    }
+
+    public WorldState()
+    {
+        Seed = -1;
+        Random = new Random();
+        Random.OnRandomUpdate += OnRandomUpdate;
         _entityIdToType.EnsureCapacity(ushort.MaxValue);
         for (var i = ushort.MaxValue; i > 0; i++)
             _entityIdToType.Add(i, EntityType.Null);
@@ -41,6 +56,7 @@ public sealed class WorldState : State<WorldState>
     public override void Serialize(Packet packet)
     {
         packet.Write(_worldTime);
+        packet.Write(Random.GetSeed());
         packet.Write(_chunks.Count);
         foreach (var chunk in _chunks.Values)
             chunk.Serialize(packet);
@@ -59,6 +75,8 @@ public sealed class WorldState : State<WorldState>
     public override void Deserialize(Packet packet)
     {
         packet.Read(out _worldTime);
+        packet.Read(out long seed);
+        Random.SetSeed(seed);
         packet.Read(out int chunkCount);
         _chunks.EnsureCapacity(chunkCount);
         for (var i = 0; i < chunkCount; i++)
@@ -85,7 +103,7 @@ public sealed class WorldState : State<WorldState>
             _entityIdToType[playerId] = EntityType.Player;
             var player = new PlayerState(playerId);
             player.Deserialize(packet);
-            _players.Add(playerId, player);
+            RegisterPlayer(player);
         }
     }
 
@@ -293,7 +311,7 @@ public sealed class WorldState : State<WorldState>
                                 case EntityType.Null:
                                     throw new ArgumentOutOfRangeException(nameof(entityId), entityId, "Invalid Entity Type");
                                 case EntityType.Player:
-                                    _players.Remove(entityId);
+                                    UnregisterPlayer(entityId);
                                     _entityIdToType[entityId] = EntityType.Null;
                                     break;
                                 case EntityType.Zombie:
@@ -304,7 +322,7 @@ public sealed class WorldState : State<WorldState>
 
                             break;
                         case EntityType.Player:
-                            _players.Add(entityId, new PlayerState(entityId));
+                            RegisterPlayer(new PlayerState(entityId));
                             _entityIdToType[entityId] = EntityType.Player;
                             break;
                         case EntityType.Zombie:
@@ -329,7 +347,7 @@ public sealed class WorldState : State<WorldState>
                                 case EntityType.Null:
                                     throw new ArgumentOutOfRangeException(nameof(entityId), entityId, "Invalid Entity Type");
                                 case EntityType.Player:
-                                    _players.Remove(entityId);
+                                    UnregisterPlayer(entityId);
                                     _entityIdToType[entityId] = EntityType.Null;
                                     break;
                                 case EntityType.Zombie:
@@ -341,7 +359,7 @@ public sealed class WorldState : State<WorldState>
                             break;
                         case EntityType.Player:
                             _entityIdToType[entityId] = EntityType.Player;
-                            _players.Add(entityId, new PlayerState(entityId));
+                            RegisterPlayer(new PlayerState(entityId));
                             _players[entityId].Deserialize(changePacket);
                             break;
                         case EntityType.Zombie:
@@ -372,18 +390,124 @@ public sealed class WorldState : State<WorldState>
         chunk.OnChunkUpdate += OnChunkUpdate;
     }
 
-    private void OnChunkUpdate(Vector3i chunkPosition)
+    public PlayerState AddPlayer()
+    {
+        var result = _entityIdToType.First(GetNextEmptyEntityId);
+        _entityIdToType[result.Key] = EntityType.Player;
+        _newEntities.Add(result.Key);
+        return new PlayerState(result.Key);
+    }
+
+    public void RemovePlayer(ushort entityId)
+    {
+        _removedEntities.Add(entityId, KeyValuePair.Create(EntityType.Player, (object)_players[entityId]));
+        _entityIdToType[entityId] = EntityType.Null;
+    }
+
+    public void UnregisterPlayer(ushort entityId)
+    {
+        _players.Remove(entityId);
+    }
+
+    public static bool GetNextEmptyEntityId(KeyValuePair<ushort, EntityType> entity)
+    {
+        return entity.Value == EntityType.Null;
+    }
+
+    public void RegisterPlayer(PlayerState state)
+    {
+        state.OnEntityUpdate += OnEntityUpdate;
+        _players.Add(state.EntityId, state);
+    }
+
+    private void OnEntityUpdate(ushort entityId)
+    {
+        _entityUpdates.Add(entityId);
+    }
+
+    public void AddLight(Vector2i lightPos)
+    {
+        _lights.Add(lightPos, 0);
+    }
+
+    private void OnChunkUpdate(Vector3i chunkPosition, ushort change, BlockType blockType)
     {
         _chunkUpdates.Add(chunkPosition);
+        RecalculateLight(chunkPosition + EngineDefaults.GetVectorFromIndex(change), blockType);
+    }
+
+    private void RecalculateLight(Vector3i blockPlaced, BlockType type)
+    {
+        var currentLight = _lights[blockPlaced.Xz];
+        if (blockPlaced.Y < currentLight) return;
+
+        OnLightUpdate(blockPlaced.Xz);
+        if (EngineDefaults.Blocks[(int)type].IsBlockingLight())
+        {
+            _lights[blockPlaced.Xz] = (byte)blockPlaced.Y;
+        }
+        else
+        {
+            for (currentLight -= 1; currentLight > 0; currentLight--)
+                if (Engine.World.GetInstance()!.GetBlockAt(new Vector3i(blockPlaced.X, currentLight, blockPlaced.Z))
+                    .IsBlockingLight())
+                {
+                    _lights[blockPlaced.Xz] = currentLight;
+                    return;
+                }
+
+            _lights[blockPlaced.Xz] = 0;
+        }
+    }
+
+    private void OnLightUpdate(Vector2i lightPosition)
+    {
+        _lightUpdates[lightPosition] = _lights[lightPosition];
+    }
+
+    private void OnRandomUpdate()
+    {
+        Changes.TryAdd((ushort)StateChange.WorldRandomSeed, Random.GetSeed());
     }
 
     public EntityType GetEntityType(ushort entityId)
     {
         return _entityIdToType[entityId];
     }
-    
+
     public ChunkState GetChunkAt(Vector3i chunkPosition)
     {
         return _chunks[chunkPosition];
+    }
+
+    public void SaveWorld(GZipStream stream)
+    {
+        stream.Write(BitConverter.GetBytes(_chunks.Count));
+        var packet = new Packet(new PacketHeader(PacketType.SaveWorld));
+        foreach (var chunk in _chunks.Values) chunk.Serialize(packet);
+        stream.Write(packet.ReadAll());
+    }
+
+    public void LoadWorld(GZipStream stream)
+    {
+        var packet = new Packet(new PacketHeader(PacketType.LoadWorld));
+        var b = stream.ReadByte();
+        do
+        {
+            packet.Write(b);
+            b = stream.ReadByte();
+        } while (b != -1);
+
+        packet.Read(out int chunkCount);
+        for (var i = 0; i < chunkCount; i++)
+        {
+            packet.Read(out Vector3i chunkPosition);
+            _chunks[chunkPosition].Deserialize(packet);
+        }
+    }
+
+    public byte GetLight(Vector2i pos)
+    {
+        return _lights[pos];
     }
 }

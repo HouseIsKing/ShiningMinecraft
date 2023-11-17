@@ -87,13 +87,23 @@ public struct PlayerInput
         }
         return false;
     }
+    
+    public float GetMouseX()
+    {
+        return MouseX;
+    }
+    
+    public float GetMouseY()
+    {
+        return MouseY;
+    }
 
     public void ApplyClientInput(ClientInput input)
     {
         MouseX = input.MouseX;
         MouseY = input.MouseY;
-        byte prevKeySet1Hold = KeySet1Hold;
-        byte prevKeySet2Hold = KeySet2Hold;
+        var prevKeySet1Hold = KeySet1Hold;
+        var prevKeySet2Hold = KeySet2Hold;
         KeySet1Hold = input.KeySet1;
         KeySet2Hold = input.KeySet2;
         KeySet1Pressed = (byte)(KeySet1Hold & ~prevKeySet1Hold);

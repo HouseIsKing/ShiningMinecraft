@@ -11,4 +11,19 @@
       <ProjectReference Include="..\MinecraftLibrary\MinecraftLibrary.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="Render\Shaders\GUIVertexShader.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\GUIFragmentShader.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\FragmentShader.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\VertexShader.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
 </Project>

@@ -2,7 +2,8 @@
 
 public class MinecraftClientMP : MinecraftClient
 {
-    public MinecraftClientMP() : base()
+    public MinecraftClientMP() : base(null)
     {
+        throw new NotImplementedException("Error");
     }
 }

@@ -5,7 +5,7 @@ namespace MinecraftLibrary.Engine.States.World;
 
 public sealed class ChunkState : State<ChunkState>
 {
-    public event EngineDefaults.ChunkUpdateHandler OnChunkUpdate;
+    public event EngineDefaults.ChunkUpdateHandler? OnChunkUpdate;
     public Vector3i ChunkPosition { get; }
     private BlockType[] Blocks { get; } = new BlockType[EngineDefaults.ChunkHeight * EngineDefaults.ChunkWidth * EngineDefaults.ChunkDepth];
 
@@ -48,7 +48,7 @@ public sealed class ChunkState : State<ChunkState>
     public void SetBlockAt(ushort index, BlockType blockType)
     {
         Changes.TryAdd(index, Blocks[index]);
-        OnChunkUpdate.Invoke(ChunkPosition);
+        OnChunkUpdate?.Invoke(ChunkPosition, index, blockType);
         Blocks[index] = blockType;
     }
 

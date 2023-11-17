@@ -3,6 +3,7 @@
 public enum StateChange : ushort
 {
     WorldTime,
+    WorldRandomSeed,
     WorldEntityEnter,
     WorldEntityLeave,
     WorldChunk,

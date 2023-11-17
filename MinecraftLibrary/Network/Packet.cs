@@ -188,8 +188,19 @@ public class Packet
         Read(out data.Y);
     }
 
+    public byte[] ReadAll()
+    {
+        return Data.ToArray();
+    }
+
+    public void ResetRead()
+    {
+        DataPos = 0;
+    }
+
     public void Reset()
     {
         DataPos = 0;
+        Data.Clear();
     }
 }

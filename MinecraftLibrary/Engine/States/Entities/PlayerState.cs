@@ -1,9 +1,10 @@
 ﻿using MinecraftLibrary.Input;
 using MinecraftLibrary.Network;
+using OpenTK.Mathematics;
 
 namespace MinecraftLibrary.Engine.States.Entities;
 
-public class PlayerState : LivingEntityState<PlayerState>
+public sealed class PlayerState : LivingEntityState<PlayerState>
 {
     private float _pitch = 0.0F;
     private bool _mode = false;

@@ -4,6 +4,7 @@ namespace MinecraftLibrary.Engine;
 
 public sealed class Random
 {
+    public event EngineDefaults.RandomUpdateHandler? OnRandomUpdate;
     private const long Multiplier = 0x5DEECE66DL;
     private const long Addend = 0xBL;
     private const long Mask = (1L << 48) - 1;
@@ -25,16 +26,22 @@ public sealed class Random
         Seed = seed;
     }
 
+    public long GetSeed()
+    {
+        return Seed ^ Multiplier;
+    }
+
     private int Next(int bits)
     {
-        long oldSeed, nextSeed;
+        OnRandomUpdate?.Invoke();
+        long oldSeed;
         do
         {
             oldSeed = Seed;
-            nextSeed = (oldSeed * Multiplier + Addend) & Mask;
+            Seed = (oldSeed * Multiplier + Addend) & Mask;
         } while (Seed != oldSeed);
 
-        return (int)(nextSeed >>> (48 - bits));
+        return (int)(Seed >>> (48 - bits));
     }
 
     public int NextInt()

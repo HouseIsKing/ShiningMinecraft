@@ -1,6 +1,6 @@
 ﻿namespace MinecraftClient;
 
-public abstract class Program
+file static class Program
 {
     public static void Main(string[] args)
     {

@@ -5,7 +5,7 @@ namespace MinecraftLibrary.Engine.States.Entities;
 
 public abstract class EntityState<TEntityType> : State<TEntityType> where TEntityType : EntityState<TEntityType>
 {
-    public event EngineDefaults.EntityUpdateHandler OnEntityUpdate;
+    public event EngineDefaults.EntityUpdateHandler? OnEntityUpdate;
     private bool _isGrounded;
     private Vector3 _position;
     private Vector3 _rotation;
@@ -159,6 +159,6 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
     
     protected void TriggerEntityUpdate()
     {
-        OnEntityUpdate.Invoke(EntityId);
+        OnEntityUpdate?.Invoke(EntityId);
     }
 }

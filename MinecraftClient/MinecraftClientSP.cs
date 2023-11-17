@@ -1,8 +1,10 @@
-﻿namespace MinecraftClient;
+﻿using MinecraftLibrary.Engine;
+
+namespace MinecraftClient;
 
 public class MinecraftClientSP : MinecraftClient
 {
-    public MinecraftClientSP() : base()
+    public MinecraftClientSP() : base(new World())
     {
     }
 }
