@@ -15,6 +15,7 @@ public static class EngineDefaults
     public const int ChunkDepth = 16;
     public const float CameraOffset = 1.62f;
     public static readonly Vector3 PlayerSize = new(0.3f, 0.9f, 0.3f);
+    public static readonly Vector3 ParticleSize = new(0.1f);
 
     public static readonly Block[] Blocks = new Block[]
     {

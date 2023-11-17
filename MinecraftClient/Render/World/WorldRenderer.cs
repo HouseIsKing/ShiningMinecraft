@@ -1,3 +1,4 @@
+using MinecraftClient.Render.Entities.Player;
 using MinecraftClient.Render.Shaders;
 using MinecraftClient.Render.World.Block;
 using MinecraftLibrary.Engine.States.World;
@@ -47,5 +48,19 @@ public class WorldRenderer
     private void OnChunkRenderDirty(ChunkRenderer renderer)
     {
         _dirtyChunkRenderers.Add(renderer);
+    }
+
+    public void HandleWindowResize(int height, int width)
+    {
+        GL.Viewport(0, 0, width, height);
+        Camera.GetInstance().SetAspectRatio((float)width / height);
+    }
+
+    public void Render()
+    {
+        var camera = Camera.GetInstance();
+        var cameraFrustum = camera.GetFrustum();
+        Shader.MainShader.SetMat4("view", camera.GetViewMatrix());
+        Shader.MainShader.SetMat4("projection", camera.GetProjectionMatrix());
     }
 }

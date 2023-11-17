@@ -5,7 +5,7 @@ using OpenTK.Mathematics;
 
 namespace MinecraftLibrary.Engine.Entities;
 
-public class Player : LivingEntity<PlayerState>
+public sealed class Player : LivingEntity<PlayerState>
 {
     private readonly Queue<KeyValuePair<uint, ClientInput>> _inputQueue = new();
     public uint LastInputProcessed { get; private set; }
@@ -160,12 +160,12 @@ public class Player : LivingEntity<PlayerState>
             if (State.Mode)
                 PlaceBlock();
             else
-                World.GetInstance()?.SetBlockAt(_hitPosition, BlockType.Air);
+                World.GetInstance()?.BreakBlock(_hitPosition);
         }
 
         if (!input.IsKeyPressed(KeySet.Reset)) return;
 
-        var random = World.GetInstance()?.State.Random ?? throw new InvalidOperationException();
+        var random = World.GetInstance()?.GetWorldRandom() ?? throw new InvalidOperationException();
         State.Position = new Vector3(random.NextFloat() * 256.0f, 67.0f, random.NextFloat() * 256.0f);
     }
 }

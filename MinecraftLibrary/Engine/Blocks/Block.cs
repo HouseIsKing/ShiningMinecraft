@@ -1,5 +1,6 @@
 ﻿using MinecraftLibrary.Network;
 using MinecraftLibrary.Engine;
+using MinecraftLibrary.Engine.States.Entities;
 using OpenTK.Mathematics;
 
 namespace MinecraftLibrary.Engine.Blocks;
@@ -29,11 +30,27 @@ public class Block
         return true;
     }
 
-    public virtual void Tick(World world, int x, int y, int z)
+    public virtual void Tick(World world, Vector3i pos)
     {
     }
 
-    public virtual void OnBreak(World world, int x, int y, int z)
+    public virtual void OnBreak(World world, Vector3i pos)
     {
+        for (var i = 0; i < 4; i++)
+        for (var j = 0; j < 4; j++)
+        for (var k = 0; k < 4; k++)
+        {
+            Random random = world.GetWorldRandom();
+            var particle = world.SpawnBlockParticleEntity();
+            particle.BlockParticleType = Type;
+            var offset = (new Vector3(i, j, k) + new Vector3(0.5f)) / 4.0f;
+            particle.Position = pos + offset;
+            var velocityDirection = offset - new Vector3(0.5f) + (new Vector3(random.NextFloat(), j, k) * 2.0f - Vector3.One) * 0.4f;
+            velocityDirection.NormalizeFast();
+            var velocityForce = (random.NextFloat() + random.NextFloat() + 1.0f) * 0.15f;
+            particle.Velocity = velocityDirection * velocityForce * new Vector3(0.7f, 1.0f, 0.7f);
+            particle.Scale = EngineDefaults.ParticleSize * (random.NextFloat() * 0.5f + 0.5f);
+            particle.MaxLifeTime = (byte)(4.0f / random.NextFloat() * 0.9f + 0.1f);
+        }
     }
 }

@@ -16,11 +16,14 @@ public class World
     private const int WorldHeight = 64;
     private const int WorldDepth = 256;
     private readonly SortedList<ushort, Player> _players = new();
+    private readonly SortedList<ushort, BlockParticleEntity> _blockParticles = new();
     private readonly List<PlayerState> _playersToSpawn = new();
+    private readonly List<BlockParticleEntityState> _blockParticlesToSpawn = new();
     private readonly List<ushort> _playersToDespawn = new();
+    private readonly List<ushort> _blockParticlesToDespawn = new();
     public event EngineDefaults.ChunkAddedHandler? OnChunkAdded;
     public event EngineDefaults.PlayerAddedHandler? OnPlayerAdded;
-    public WorldState State { get; }
+    private WorldState State { get; }
     public static World? GetInstance()
     {
         return _instance;
@@ -69,12 +72,20 @@ public class World
             _players.Add(state.EntityId, new Player(state));
         }
 
+        foreach (var state in _blockParticlesToSpawn)
+        {
+            State.RegisterBlockParticle(state);
+            _blockParticles.Add(state.EntityId, new BlockParticleEntity(state));
+        }
+
+        _blockParticlesToSpawn.Clear();
         _playersToSpawn.Clear();
     }
 
     private void TickEntities()
     {
-        foreach (var player in _players) player.Value.Tick();
+        foreach (var player in _players.Values) player.Tick();
+        foreach (var blockParticle in _blockParticles.Values) blockParticle.Tick();
     }
 
     private void TickWorld()
@@ -83,10 +94,8 @@ public class World
         var random = State.Random;
         for (var i = 0; i < numTilesToTick; i++)
         {
-            var x = random.NextInt(WorldWidth);
-            var y = random.NextInt(WorldHeight);
-            var z = random.NextInt(WorldDepth);
-            GetBlockAt(new Vector3i(x, y, z)).Tick(this, x, y, z);
+            Vector3i pos = new(random.NextInt(WorldWidth), random.NextInt(WorldHeight), random.NextInt(WorldDepth));
+            GetBlockAt(pos).Tick(this, pos);
         }
     }
 
@@ -111,7 +120,15 @@ public class World
             State.UnregisterPlayer(id);
             _players.Remove(id);
         }
+
+        foreach (var id in _blockParticlesToDespawn)
+        {
+            State.UnregisterBlockParticle(id);
+            _blockParticles.Remove(id);
+        }
+
         _playersToDespawn.Clear();
+        _blockParticlesToDespawn.Clear();
     }
 
     public void SaveWorld()
@@ -144,11 +161,24 @@ public class World
         _playersToSpawn.Add(state);
         return state;
     }
+    
+    public BlockParticleEntityState SpawnBlockParticleEntity()
+    {
+        var state = State.AddBlockParticleEntity();
+        _blockParticlesToSpawn.Add(state);
+        return state;
+    }
 
     public void DespawnPlayer(ushort id)
     {
         State.RemovePlayer(id);
         _playersToDespawn.Add(id);
+    }
+
+    public void DespawnBlockParticleEntity(ushort id)
+    {
+        State.RemoveBlockParticle(id);
+        _blockParticlesToDespawn.Add(id);
     }
 
     public Block GetBlockAt(Vector3i pos)
@@ -179,6 +209,13 @@ public class World
         }
 
         return blocks;
+    }
+    
+    public void BreakBlock(Vector3i pos)
+    {
+        var block = GetBlockAt(pos);
+        block.OnBreak(this, pos);
+        SetBlockAt(pos, BlockType.Air);
     }
 
     public void SetBlockAt(Vector3i pos, BlockType block)
@@ -285,5 +322,10 @@ public class World
     public byte GetBrightnessAt(Vector3i pos)
     {
         return (byte)(State.GetLight(pos.Xz) > pos.Y ? 1u : 0u);
+    }
+
+    public Random GetWorldRandom()
+    {
+        return State.Random;
     }
 }

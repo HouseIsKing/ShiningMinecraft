@@ -20,5 +20,8 @@ public enum StateChange : ushort
     PlayerPitch,
     PlayerMode,
     PlayerCurrentSelectedBlock,
-    PlayerInput
+    PlayerInput,
+    BlockParticleLifeTime,
+    BlockParticleMaxLifeTime,
+    BlockParticleType
 }

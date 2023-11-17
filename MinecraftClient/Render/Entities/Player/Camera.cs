@@ -1,8 +1,6 @@
-﻿using System.Numerics;
-using OpenTK.Mathematics;
-using Vector3 = System.Numerics.Vector3;
+﻿using OpenTK.Mathematics;
 
-namespace MinecraftClient.Entities.Player;
+namespace MinecraftClient.Render.Entities.Player;
 
 public class Camera
 {
@@ -11,8 +9,8 @@ public class Camera
     private Vector3 Right;
     private float Fov;
     private float AspectRatio;
-    private Matrix4x4 ViewMatrix;
-    private Matrix4x4 ProjectionMatrix;
+    private Matrix4 ViewMatrix;
+    private Matrix4 ProjectionMatrix;
     private bool IsDirtyProjectionMatrix;
     private float PrevYaw;
     private float PrevPitch;
@@ -69,13 +67,13 @@ public class Camera
         return Front;
     }
     
-    public Matrix4x4 GetViewMatrix()
+    public Matrix4 GetViewMatrix()
     {
         RecalculateViewMatrix();
         return ViewMatrix;
     }
 
-    public Matrix4x4 GetProjectionMatrix()
+    public Matrix4 GetProjectionMatrix()
     {
         if (IsDirtyProjectionMatrix)
         {
@@ -93,7 +91,7 @@ public class Camera
 
     private void RecalculateProjectionMatrix()
     {
-        ProjectionMatrix = Matrix4x4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(Fov), AspectRatio, ZNear, ZFar);
+        ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(Fov), AspectRatio, ZNear, ZFar);
         IsDirtyProjectionMatrix = false;
     }
 
@@ -102,6 +100,6 @@ public class Camera
         PrevYaw = Yaw;
         PrevPitch = Pitch;
         UpdateVectors();
-        ViewMatrix = Matrix4x4.CreateLookAt(Position, Position + Front, Up);
+        ViewMatrix = Matrix4.LookAt(Position, Position + Front, Up);
     }
 }

@@ -1,4 +1,3 @@
-using MinecraftClient.Render.Shaders;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 

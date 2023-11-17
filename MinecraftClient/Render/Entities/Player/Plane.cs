@@ -1,4 +1,4 @@
-﻿namespace MinecraftClient.Entities.Player;
+﻿namespace MinecraftClient.Render.Entities.Player;
 
 public enum Plane
 {

@@ -10,6 +10,7 @@ public sealed class WorldState : State<WorldState>
     private readonly Dictionary<Vector3i, ChunkState> _chunks = new();
     private readonly Dictionary<Vector2i, byte> _lights = new();
     private readonly SortedDictionary<ushort, PlayerState> _players = new();
+    private readonly SortedDictionary<ushort, BlockParticleEntityState> _blockParticles = new();
     private readonly Dictionary<ushort, EntityType> _entityIdToType = new();
     private readonly HashSet<Vector3i> _chunkUpdates = new();
     private readonly Dictionary<Vector2i, byte> _lightUpdates = new();
@@ -398,26 +399,51 @@ public sealed class WorldState : State<WorldState>
         return new PlayerState(result.Key);
     }
 
+    public BlockParticleEntityState AddBlockParticleEntity()
+    {
+        var result = _entityIdToType.First(GetNextEmptyEntityId);
+        _entityIdToType[result.Key] = EntityType.BlockBreakParticle;
+        _newEntities.Add(result.Key);
+        return new BlockParticleEntityState(result.Key);
+    }
+
     public void RemovePlayer(ushort entityId)
     {
         _removedEntities.Add(entityId, KeyValuePair.Create(EntityType.Player, (object)_players[entityId]));
         _entityIdToType[entityId] = EntityType.Null;
     }
 
-    public void UnregisterPlayer(ushort entityId)
+    public void RemoveBlockParticle(ushort entityId)
     {
-        _players.Remove(entityId);
-    }
-
-    public static bool GetNextEmptyEntityId(KeyValuePair<ushort, EntityType> entity)
-    {
-        return entity.Value == EntityType.Null;
+        _removedEntities.Add(entityId, KeyValuePair.Create(EntityType.BlockBreakParticle, (object)_blockParticles[entityId]));
+        _entityIdToType[entityId] = EntityType.Null;
     }
 
     public void RegisterPlayer(PlayerState state)
     {
         state.OnEntityUpdate += OnEntityUpdate;
         _players.Add(state.EntityId, state);
+    }
+
+    public void RegisterBlockParticle(BlockParticleEntityState state)
+    {
+        state.OnEntityUpdate += OnEntityUpdate;
+        _blockParticles.Add(state.EntityId, state);
+    }
+
+    public void UnregisterPlayer(ushort entityId)
+    {
+        _players.Remove(entityId);
+    }
+    
+    public void UnregisterBlockParticle(ushort entityId)
+    {
+        _blockParticles.Remove(entityId);
+    }
+
+    private static bool GetNextEmptyEntityId(KeyValuePair<ushort, EntityType> entity)
+    {
+        return entity.Value == EntityType.Null;
     }
 
     private void OnEntityUpdate(ushort entityId)

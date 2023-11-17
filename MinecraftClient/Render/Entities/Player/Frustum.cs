@@ -1,18 +1,16 @@
-﻿using System.Numerics;
-using OpenTK.Mathematics;
-using Vector4 = OpenTK.Mathematics.Vector4;
+﻿using OpenTK.Mathematics;
 
-namespace MinecraftClient.Entities.Player;
+namespace MinecraftClient.Render.Entities.Player;
 
 public readonly struct Frustum
 {
     private readonly Vector4[] _planes = new Vector4[6];
 
-    public Frustum(Matrix4x4 viewMatrix, Matrix4x4 projectionMatrix)
+    public Frustum(Matrix4 viewMatrix, Matrix4 projectionMatrix)
     {
         var v = viewMatrix;
         var p = projectionMatrix;
-        Matrix4x4 clipMatrix = new Matrix4x4
+        var clipMatrix = new Matrix4
         {
             [0, 0] = v[0, 0] * p[0, 0] + v[0, 1] * p[1, 0] + v[0, 2] * p[2, 0] + v[0, 3] * p[3, 0],
             [1, 0] = v[0, 0] * p[0, 1] + v[0, 1] * p[1, 1] + v[0, 2] * p[2, 1] + v[0, 3] * p[3, 1],
@@ -41,48 +39,22 @@ public readonly struct Frustum
         _planes[(int)Plane.PlaneTop] = row3 - row1;
         _planes[(int)Plane.PlaneBack] = row3 - row2;
         _planes[(int)Plane.PlaneFront] = row3 + row2;
-        for (byte i = 0; i < 6; i++)
-        {
-            _planes[i] = Vector4.Normalize(_planes[i]);
-        }
+        for (byte i = 0; i < 6; i++) _planes[i] = Vector4.Normalize(_planes[i]);
     }
 
     private bool CubeInFrustum(float minX, float minY, float minZ, float maxX, float maxY, float maxZ)
     {
         for (byte i = 0; i < 6; i++)
         {
-            if (_planes[i].X * minX + _planes[i].Y * minY + _planes[i].Z * minZ + _planes[i].W > 0)
-            {
-                continue;
-            }
-            if (_planes[i].X * maxX + _planes[i].Y * minY + _planes[i].Z * minZ + _planes[i].W > 0)
-            {
-                continue;
-            }
-            if (_planes[i].X * minX + _planes[i].Y * maxY + _planes[i].Z * minZ + _planes[i].W > 0)
-            {
-                continue;
-            }
-            if (_planes[i].X * maxX + _planes[i].Y * maxY + _planes[i].Z * minZ + _planes[i].W > 0)
-            {
-                continue;
-            }
-            if (_planes[i].X * minX + _planes[i].Y * minY + _planes[i].Z * maxZ + _planes[i].W > 0)
-            {
-                continue;
-            }
-            if (_planes[i].X * maxX + _planes[i].Y * minY + _planes[i].Z * maxZ + _planes[i].W > 0)
-            {
-                continue;
-            }
-            if (_planes[i].X * minX + _planes[i].Y * maxY + _planes[i].Z * maxZ + _planes[i].W > 0)
-            {
-                continue;
-            }
-            if (_planes[i].X * maxX + _planes[i].Y * maxY + _planes[i].Z * maxZ + _planes[i].W > 0)
-            {
-                continue;
-            }
+            if (_planes[i].X * minX + _planes[i].Y * minY + _planes[i].Z * minZ + _planes[i].W > 0) continue;
+            if (_planes[i].X * maxX + _planes[i].Y * minY + _planes[i].Z * minZ + _planes[i].W > 0) continue;
+            if (_planes[i].X * minX + _planes[i].Y * maxY + _planes[i].Z * minZ + _planes[i].W > 0) continue;
+            if (_planes[i].X * maxX + _planes[i].Y * maxY + _planes[i].Z * minZ + _planes[i].W > 0) continue;
+            if (_planes[i].X * minX + _planes[i].Y * minY + _planes[i].Z * maxZ + _planes[i].W > 0) continue;
+            if (_planes[i].X * maxX + _planes[i].Y * minY + _planes[i].Z * maxZ + _planes[i].W > 0) continue;
+            if (_planes[i].X * minX + _planes[i].Y * maxY + _planes[i].Z * maxZ + _planes[i].W > 0) continue;
+            if (_planes[i].X * maxX + _planes[i].Y * maxY + _planes[i].Z * maxZ + _planes[i].W > 0) continue;
+
             // If we get here, it isn't in the frustum
             return false;
         }
