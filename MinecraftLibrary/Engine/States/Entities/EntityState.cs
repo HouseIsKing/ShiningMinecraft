@@ -5,7 +5,8 @@ namespace MinecraftLibrary.Engine.States.Entities;
 
 public abstract class EntityState<TEntityType> : State<TEntityType> where TEntityType : EntityState<TEntityType>
 {
-    public event EngineDefaults.EntityUpdateHandler? OnEntityUpdate;
+    private readonly (bool, object)[] _changes = new (bool, object)[Enum.GetValues<EEntityChange>().Length];
+    private byte _changesCount;
     private bool _isGrounded;
     private Vector3 _position;
     private Vector3 _rotation;
@@ -13,10 +14,12 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
     private Vector3 _velocity;
     public ushort EntityId { get; }
     public EntityType EntityType { get; }
+
     protected EntityState(ushort id, EntityType type)
     {
         EntityType = type;
         EntityId = id;
+        for (var i = 0; i < _changes.Length; i++) _changes[i] = (false, id);
     }
 
     public Vector3 Position
@@ -24,8 +27,14 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
         get => _position;
         set
         {
-            Changes.TryAdd((ushort)StateChange.EntityPosition, _position);
-            TriggerEntityUpdate();
+            IsDirty = true;
+            if (!_changes[(byte)EEntityChange.Position].Item1)
+            {
+                _changes[(byte)EEntityChange.Position].Item1 = true;
+                _changes[(byte)EEntityChange.Position].Item2 = _position;
+                _changesCount++;
+            }
+
             _position = value;
         }
     }
@@ -35,8 +44,14 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
         get => _rotation;
         set
         {
-            Changes.TryAdd((ushort)StateChange.EntityRotation, _rotation);
-            TriggerEntityUpdate();
+            IsDirty = true;
+            if (!_changes[(byte)EEntityChange.Rotation].Item1)
+            {
+                _changes[(byte)EEntityChange.Rotation].Item1 = true;
+                _changes[(byte)EEntityChange.Rotation].Item2 = _rotation;
+                _changesCount++;
+            }
+
             _rotation = value;
         }
     }
@@ -46,8 +61,14 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
         get => _scale;
         set
         {
-            Changes.TryAdd((ushort)StateChange.EntityScale, _scale);
-            TriggerEntityUpdate();
+            IsDirty = true;
+            if (!_changes[(byte)EEntityChange.Scale].Item1)
+            {
+                _changes[(byte)EEntityChange.Scale].Item1 = true;
+                _changes[(byte)EEntityChange.Scale].Item2 = _scale;
+                _changesCount++;
+            }
+
             _scale = value;
         }
     }
@@ -57,8 +78,14 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
         get => _velocity;
         set
         {
-            Changes.TryAdd((ushort)StateChange.EntityVelocity, _velocity);
-            TriggerEntityUpdate();
+            IsDirty = true;
+            if (!_changes[(byte)EEntityChange.Velocity].Item1)
+            {
+                _changes[(byte)EEntityChange.Velocity].Item1 = true;
+                _changes[(byte)EEntityChange.Velocity].Item2 = _velocity;
+                _changesCount++;
+            }
+
             _velocity = value;
         }
     }
@@ -68,8 +95,14 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
         get => _isGrounded;
         set
         {
-            Changes.TryAdd((ushort)StateChange.EntityIsGrounded, _isGrounded);
-            TriggerEntityUpdate();
+            IsDirty = true;
+            if (!_changes[(byte)EEntityChange.IsGrounded].Item1)
+            {
+                _changes[(byte)EEntityChange.IsGrounded].Item1 = true;
+                _changes[(byte)EEntityChange.IsGrounded].Item2 = _isGrounded;
+                _changesCount++;
+            }
+
             _isGrounded = value;
         }
     }
@@ -94,71 +127,103 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
         packet.Read(out _isGrounded);
     }
 
-    protected override void SerializeChangeToChangePacket(Packet changePacket, ushort change)
+    public override void SerializeChangesToChangePacket(Packet changePacket)
     {
-        switch ((StateChange)change)
+        changePacket.Write(_changesCount);
+        for (byte i = 0; i < _changes.Length; i++)
+            if (_changes[i].Item1)
+            {
+                changePacket.Write(i);
+                SerializeChangeToChangePacket(changePacket, i);
+            }
+    }
+
+    private void SerializeChangeToChangePacket(Packet changePacket, byte change)
+    {
+        switch ((EEntityChange)change)
         {
-            case StateChange.EntityPosition:
+            case EEntityChange.Position:
                 changePacket.Write(Position);
                 break;
-            case StateChange.EntityRotation:
+            case EEntityChange.Rotation:
                 changePacket.Write(Rotation);
                 break;
-            case StateChange.EntityScale:
+            case EEntityChange.Scale:
                 changePacket.Write(Scale);
                 break;
-            case StateChange.EntityVelocity:
+            case EEntityChange.Velocity:
                 changePacket.Write(Velocity);
                 break;
-            case StateChange.EntityIsGrounded:
+            case EEntityChange.IsGrounded:
                 changePacket.Write(IsGrounded);
                 break;
+        }
+    }
+
+    public override void SerializeChangesToRevertPacket(Packet revertPacket)
+    {
+        revertPacket.Write(_changesCount);
+        for (byte i = 0; i < _changes.Length; i++)
+            if (_changes[i].Item1)
+            {
+                revertPacket.Write(i);
+                SerializeChangeToRevertPacket(revertPacket, i);
+            }
+    }
+
+    private void SerializeChangeToRevertPacket(Packet revertPacket, byte change)
+    {
+        switch ((EEntityChange)change)
+        {
+            case EEntityChange.Position or EEntityChange.Rotation or EEntityChange.Scale or EEntityChange.Velocity:
+                revertPacket.Write((Vector3)_changes[change].Item2);
+                break;
+            case EEntityChange.IsGrounded:
+                revertPacket.Write((bool)_changes[change].Item2);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(change), change, "Invalid Entity State Change");
         }
     }
 
-    protected override void SerializeChangeToRevertPacket(Packet revertPacket, ushort change)
+    public override void DeserializeChanges(Packet changePacket)
     {
-        switch ((StateChange)change)
+        changePacket.Read(out byte changeCount);
+        for (var i = 0; i < changeCount; i++)
         {
-            case StateChange.EntityPosition or StateChange.EntityRotation or StateChange.EntityScale or StateChange.EntityVelocity:
-                revertPacket.Write((Vector3)Changes[change]);
-                break;
-            case StateChange.EntityIsGrounded:
-                revertPacket.Write((bool)Changes[change]);
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(change), change, "Invalid Entity State Change");
+            changePacket.Read(out byte change);
+            DeserializeChange(changePacket, change);
         }
     }
 
-    protected override void DeserializeChange(Packet packet, ushort change)
+    private void DeserializeChange(Packet packet, byte change)
     {
-        switch ((StateChange)change)
+        switch ((EEntityChange)change)
         {
-            case StateChange.EntityPosition:
+            case EEntityChange.Position:
                 packet.Read(out _position);
                 break;
-            case StateChange.EntityRotation:
+            case EEntityChange.Rotation:
                 packet.Read(out _rotation);
                 break;
-            case StateChange.EntityScale:
+            case EEntityChange.Scale:
                 packet.Read(out _scale);
                 break;
-            case StateChange.EntityVelocity:
+            case EEntityChange.Velocity:
                 packet.Read(out _velocity);
                 break;
-            case StateChange.EntityIsGrounded:
+            case EEntityChange.IsGrounded:
                 packet.Read(out _isGrounded);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(change), change, "Invalid Entity State Change");
         }
     }
-    
-    protected void TriggerEntityUpdate()
+
+    public override void FinalizeChanges()
     {
-        OnEntityUpdate?.Invoke(EntityId);
+        base.FinalizeChanges();
+        _changesCount = 0;
+        for (var i = 0; i < _changes.Length; i++) _changes[i].Item1 = false;
     }
 }

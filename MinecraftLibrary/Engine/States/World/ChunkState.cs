@@ -5,13 +5,15 @@ namespace MinecraftLibrary.Engine.States.World;
 
 public sealed class ChunkState : State<ChunkState>
 {
-    public event EngineDefaults.ChunkUpdateHandler? OnChunkUpdate;
     public Vector3i ChunkPosition { get; }
     private BlockType[] Blocks { get; } = new BlockType[EngineDefaults.ChunkHeight * EngineDefaults.ChunkWidth * EngineDefaults.ChunkDepth];
+    private readonly (bool, BlockType)[] _changes = new (bool, BlockType)[EngineDefaults.ChunkHeight * EngineDefaults.ChunkWidth * EngineDefaults.ChunkDepth];
+    private ushort _changesCount;
 
     public ChunkState(Vector3i pos)
     {
         ChunkPosition = pos;
+        for (var i = 0; i < _changes.Length; i++) _changes[i] = (false, BlockType.Air);
     }
 
     public override void Serialize(Packet packet)
@@ -29,26 +31,56 @@ public sealed class ChunkState : State<ChunkState>
         }
     }
 
-    protected override void SerializeChangeToChangePacket(Packet changePacket, ushort change)
+    public override void SerializeChangesToChangePacket(Packet changePacket)
     {
-        changePacket.Write((byte)Blocks[change]);
+        changePacket.Write(_changesCount);
+        for (ushort i = 0; i < _changes.Length; i++)
+            if (_changes[i].Item1)
+            {
+                changePacket.Write(i);
+                changePacket.Write((byte)Blocks[i]);
+            }
     }
 
-    protected override void SerializeChangeToRevertPacket(Packet revertPacket, ushort change)
+    public override void SerializeChangesToRevertPacket(Packet revertPacket)
     {
-        revertPacket.Write((byte)Changes[change]);
+        revertPacket.Write(_changesCount);
+        for (ushort i = 0; i < _changes.Length; i++)
+            if (_changes[i].Item1)
+            {
+                revertPacket.Write(i);
+                revertPacket.Write((byte)_changes[i].Item2);
+            }
     }
 
-    protected override void DeserializeChange(Packet changePacket, ushort change)
+    public override void DeserializeChanges(Packet changePacket)
     {
-        changePacket.Read(out byte blockType);
-        Blocks[change] = (BlockType)blockType;
+        changePacket.Read(out ushort changeCount);
+        for (var i = 0; i < changeCount; i++)
+        {
+            changePacket.Read(out ushort index);
+            changePacket.Read(out byte blockType);
+            Blocks[index] = (BlockType)blockType;
+        }
+    }
+
+    public override void FinalizeChanges()
+    {
+        base.FinalizeChanges();
+        _changesCount = 0;
+        for (var i = 0; i < _changes.Length; i++) _changes[i].Item1 = false;
     }
 
     public void SetBlockAt(ushort index, BlockType blockType)
     {
-        Changes.TryAdd(index, Blocks[index]);
-        OnChunkUpdate?.Invoke(ChunkPosition, index, blockType);
+        IsDirty = true;
+        if (!_changes[index].Item1)
+        {
+            _changes[index].Item1 = true;
+            _changes[index].Item2 = Blocks[index];
+            _changesCount++;
+        }
+
         Blocks[index] = blockType;
     }
 

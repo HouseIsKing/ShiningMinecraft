@@ -23,7 +23,10 @@ public class World
     private readonly List<ushort> _blockParticlesToDespawn = new();
     public event EngineDefaults.ChunkAddedHandler? OnChunkAdded;
     public event EngineDefaults.PlayerAddedHandler? OnPlayerAdded;
+    public event EngineDefaults.TickStartHandler? OnTickStart;
+    public event EngineDefaults.TickEndHandler? OnTickEnd;
     private WorldState State { get; }
+
     public static World? GetInstance()
     {
         return _instance;
@@ -54,22 +57,13 @@ public class World
         _instance = null;
     }
 
-    public void Run()
-    {
-        
-    }
-
-    public void NewTick()
-    {
-        
-    }
-
     protected void PreTick()
     {
         foreach (var state in _playersToSpawn)
         {
             State.RegisterPlayer(state);
             _players.Add(state.EntityId, new Player(state));
+            OnPlayerAdded?.Invoke(state);
         }
 
         foreach (var state in _blockParticlesToSpawn)
@@ -101,16 +95,20 @@ public class World
 
     public void Tick(Packet packet, bool revertPacket)
     {
+        packet.Reset();
         PreTick();
+        OnTickStart?.Invoke();
         State.WorldTime += 1;
         TickEntities();
         TickWorld();
         PostTick();
+        OnTickEnd?.Invoke();
         if (revertPacket)
             State.SerializeChangesToRevertPacket(packet);
         else
             State.SerializeChangesToChangePacket(packet);
         State.FinalizeChanges();
+        packet.WriteDataLength();
     }
 
     protected void PostTick()
@@ -152,6 +150,9 @@ public class World
         if (pos.X < 0) chunkPos.X -= EngineDefaults.ChunkWidth;
         if (pos.Y < 0) chunkPos.Y -= EngineDefaults.ChunkHeight;
         if (pos.Z < 0) chunkPos.Z -= EngineDefaults.ChunkDepth;
+        chunkPos.X *= EngineDefaults.ChunkWidth;
+        chunkPos.Y *= EngineDefaults.ChunkHeight;
+        chunkPos.Z *= EngineDefaults.ChunkDepth;
         return State.GetChunkAt(chunkPos);
     }
 
@@ -224,6 +225,7 @@ public class World
         ChunkState chunk = GetChunkAt(pos);
         var indexVector = pos - chunk.ChunkPosition;
         chunk.SetBlockAt(EngineDefaults.GetIndexFromVector(indexVector), block);
+        RecalculateLight(pos, block);
     }
 
     private static bool IsOutOfBounds(Vector3i pos)
@@ -318,14 +320,54 @@ public class World
             }
         }
     }
+    
+    private void RecalculateLight(Vector3i blockPlaced, BlockType type)
+    {
+        var currentLight = State.GetLight(blockPlaced.Xz);
+        if (blockPlaced.Y < currentLight) return;
+        
+        if (EngineDefaults.Blocks[(int)type].IsBlockingLight())
+        {
+            State.SetLight(blockPlaced.Xz, (byte)blockPlaced.Y);
+        }
+        else
+        {
+            for (currentLight -= 1; currentLight > 0; currentLight--)
+                if (GetBlockAt(new Vector3i(blockPlaced.X, currentLight, blockPlaced.Z))
+                    .IsBlockingLight())
+                {
+                    State.SetLight(blockPlaced.Xz, currentLight);
+                    return;
+                }
+
+            State.SetLight(blockPlaced.Xz, 0);
+        }
+    }
 
     public byte GetBrightnessAt(Vector3i pos)
     {
+        if (IsOutOfBounds(pos)) return 0;
+
         return (byte)(State.GetLight(pos.Xz) > pos.Y ? 1u : 0u);
     }
 
     public Random GetWorldRandom()
     {
         return State.Random;
+    }
+
+    public ulong GetWorldTime()
+    {
+        return State.WorldTime;
+    }
+    
+    public void Serialize(Packet packet)
+    {
+        State.Serialize(packet);
+    }
+
+    public Player GetPlayer(ushort id)
+    {
+        return _players[id];
     }
 }

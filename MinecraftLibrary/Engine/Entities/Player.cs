@@ -7,8 +7,8 @@ namespace MinecraftLibrary.Engine.Entities;
 
 public sealed class Player : LivingEntity<PlayerState>
 {
-    private readonly Queue<KeyValuePair<uint, ClientInput>> _inputQueue = new();
-    public uint LastInputProcessed { get; private set; }
+    private readonly Queue<KeyValuePair<ulong, ClientInput>> _inputQueue = new();
+    public ulong LastInputProcessed { get; private set; }
     private bool _foundBlock;
     private Vector3i _hitPosition;
     private BlockFaces _hitFace;
@@ -35,7 +35,7 @@ public sealed class Player : LivingEntity<PlayerState>
         ProcessCurrentPlayerInput();
     }
 
-    public void AddInput(uint inputId, ClientInput input)
+    public void AddInput(ulong inputId, ClientInput input)
     {
         _inputQueue.Enqueue(KeyValuePair.Create(inputId, input));
     }

@@ -4,21 +4,16 @@ using OpenTK.Graphics.ES30;
 
 namespace MinecraftLibrary.Network;
 
-public struct PacketHeader
+public struct PacketHeader(PacketType type)
 {
-    public PacketType Type;
+    public PacketType Type = type;
     public uint Size;
     public static readonly PacketHeader PlayerIdPacket = new PacketHeader(PacketType.PlayerId, sizeof(ushort));
 
     public static readonly PacketHeader ClientInputHeader =
-        new PacketHeader(PacketType.ClientInput, (uint)Marshal.SizeOf<ClientInput>() + sizeof(ulong));
+        new(PacketType.ClientInput, (uint)Marshal.SizeOf<ClientInput>() + sizeof(ulong));
 
-    public PacketHeader(PacketType type)
-    {
-        Type = type;
-    }
-
-    public PacketHeader(PacketType type, uint size) : this(type)
+    private PacketHeader(PacketType type, uint size) : this(type)
     {
         Size = size;
     }

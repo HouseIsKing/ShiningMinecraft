@@ -14,6 +14,8 @@ public static class EngineDefaults
     public const int ChunkWidth = 16;
     public const int ChunkDepth = 16;
     public const float CameraOffset = 1.62f;
+    public const float TickRate = 0.05f;
+    public const int PacketHistorySize = 20;
     public static readonly Vector3 PlayerSize = new(0.3f, 0.9f, 0.3f);
     public static readonly Vector3 ParticleSize = new(0.1f);
 
@@ -22,7 +24,7 @@ public static class EngineDefaults
         new AirBlock(), new GrassBlock(), new DirtBlock(), new CobblestoneBlock(), new StoneBlock(), new PlanksBlock(),
         new SaplingBlock()
     };
-    public static byte[] GetBytes(ClientInput data)
+    public static IEnumerable<byte> GetBytes(ClientInput data)
     {
         var size = Marshal.SizeOf(data);
         var arr = new byte[size];
@@ -162,6 +164,9 @@ public static class EngineDefaults
     {
         return new Vector3i(index / ChunkDepth / ChunkHeight, index / ChunkDepth % ChunkHeight, index % ChunkDepth);
     }
+    
+    public delegate void TickStartHandler();
+    public delegate void TickEndHandler();
 
     public delegate void ChunkUpdateHandler(Vector3i chunkPosition, ushort change, BlockType type);
 

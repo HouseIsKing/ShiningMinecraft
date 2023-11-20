@@ -4,6 +4,8 @@ namespace MinecraftLibrary.Engine.States.Entities;
 
 public abstract class LivingEntityState<TLivingEntityState> : EntityState<TLivingEntityState> where TLivingEntityState : LivingEntityState<TLivingEntityState>
 {
+    private readonly (bool, object)[] _changes = new (bool, object)[Enum.GetValues<ELivingEntityChange>().Length];
+    private byte _changesCount;
     private bool _jumpInput;
     private float _horizontalInput;
     private float _verticalInput;
@@ -13,8 +15,14 @@ public abstract class LivingEntityState<TLivingEntityState> : EntityState<TLivin
         get => _jumpInput;
         set
         {
-            Changes.TryAdd((ushort)StateChange.LivingEntityJumpInput, _jumpInput);
-            TriggerEntityUpdate();
+            IsDirty = true;
+            if (!_changes[(byte)ELivingEntityChange.JumpInput].Item1)
+            {
+                _changes[(byte)ELivingEntityChange.JumpInput].Item1 = true;
+                _changes[(byte)ELivingEntityChange.JumpInput].Item2 = _jumpInput;
+                _changesCount++;
+            }
+
             _jumpInput = value;
         }
     }
@@ -24,8 +32,14 @@ public abstract class LivingEntityState<TLivingEntityState> : EntityState<TLivin
         get => _horizontalInput;
         set
         {
-            Changes.TryAdd((ushort)StateChange.LivingEntityHorizontalInput, _horizontalInput);
-            TriggerEntityUpdate();
+            IsDirty = true;
+            if (!_changes[(byte)ELivingEntityChange.HorizontalInput].Item1)
+            {
+                _changes[(byte)ELivingEntityChange.HorizontalInput].Item1 = true;
+                _changes[(byte)ELivingEntityChange.HorizontalInput].Item2 = _horizontalInput;
+                _changesCount++;
+            }
+
             _horizontalInput = value;
         }
     }
@@ -35,14 +49,21 @@ public abstract class LivingEntityState<TLivingEntityState> : EntityState<TLivin
         get => _verticalInput;
         set
         {
-            Changes.TryAdd((ushort)StateChange.LivingEntityVerticalInput, _verticalInput);
-            TriggerEntityUpdate();
+            IsDirty = true;
+            if (!_changes[(byte)ELivingEntityChange.VerticalInput].Item1)
+            {
+                _changes[(byte)ELivingEntityChange.VerticalInput].Item1 = true;
+                _changes[(byte)ELivingEntityChange.VerticalInput].Item2 = _verticalInput;
+                _changesCount++;
+            }
+
             _verticalInput = value;
         }
     }
 
     protected LivingEntityState(ushort id, EntityType type) : base(id, type)
     {
+        for (var i = 0; i < _changes.Length; i++) _changes[i] = (false, id);
     }
 
     public override void Serialize(Packet packet)
@@ -61,57 +82,90 @@ public abstract class LivingEntityState<TLivingEntityState> : EntityState<TLivin
         packet.Read(out _verticalInput);
     }
 
-    protected override void SerializeChangeToChangePacket(Packet changePacket, ushort change)
+    public override void SerializeChangesToChangePacket(Packet changePacket)
     {
-        switch ((StateChange)change)
+        base.SerializeChangesToChangePacket(changePacket);
+        changePacket.Write(_changesCount);
+        for (byte i = 0; i < _changes.Length; i++)
+            if (_changes[i].Item1)
+            {
+                changePacket.Write(i);
+                SerializeChangeToChangePacket(changePacket, i);
+            }
+    }
+
+    private void SerializeChangeToChangePacket(Packet changePacket, byte change)
+    {
+        switch ((ELivingEntityChange)change)
         {
-            case StateChange.LivingEntityHorizontalInput:
+            case ELivingEntityChange.HorizontalInput:
                 changePacket.Write(HorizontalInput);
                 break;
-            case StateChange.LivingEntityVerticalInput:
+            case ELivingEntityChange.VerticalInput:
                 changePacket.Write(VerticalInput);
                 break;
-            case StateChange.LivingEntityJumpInput:
+            case ELivingEntityChange.JumpInput:
                 changePacket.Write(JumpInput);
                 break;
-            default:
-                base.SerializeChangeToChangePacket(changePacket, change);
+        }
+    }
+
+    public override void SerializeChangesToRevertPacket(Packet revertPacket)
+    {
+        base.SerializeChangesToRevertPacket(revertPacket);
+        revertPacket.Write(_changesCount);
+        for (byte i = 0; i < _changes.Length; i++)
+            if (_changes[i].Item1)
+            {
+                revertPacket.Write(i);
+                SerializeChangeToRevertPacket(revertPacket, i);
+            }
+    }
+
+    private void SerializeChangeToRevertPacket(Packet revertPacket, byte change)
+    {
+        switch ((ELivingEntityChange)change)
+        {
+            case ELivingEntityChange.HorizontalInput or ELivingEntityChange.VerticalInput:
+                revertPacket.Write((float)_changes[change].Item2);
+                break;
+            case ELivingEntityChange.JumpInput:
+                revertPacket.Write((bool)_changes[change].Item2);
                 break;
         }
     }
 
-    protected override void SerializeChangeToRevertPacket(Packet revertPacket, ushort change)
+    public override void DeserializeChanges(Packet changePacket)
     {
-        switch ((StateChange)change)
+        base.DeserializeChanges(changePacket);
+        changePacket.Read(out byte changeCount);
+        for (var i = 0; i < changeCount; i++)
         {
-            case StateChange.LivingEntityHorizontalInput or StateChange.LivingEntityVerticalInput:
-                revertPacket.Write((float)Changes[change]);
-                break;
-            case StateChange.LivingEntityJumpInput:
-                revertPacket.Write((bool)Changes[change]);
-                break;
-            default:
-                base.SerializeChangeToRevertPacket(revertPacket, change);
-                break;
+            changePacket.Read(out byte change);
+            DeserializeChange(changePacket, change);
         }
     }
 
-    protected override void DeserializeChange(Packet packet, ushort change)
+    private void DeserializeChange(Packet packet, byte change)
     {
-        switch ((StateChange)change)
+        switch ((ELivingEntityChange)change)
         {
-            case StateChange.LivingEntityJumpInput:
+            case ELivingEntityChange.JumpInput:
                 packet.Read(out _jumpInput);
                 break;
-            case StateChange.LivingEntityHorizontalInput:
+            case ELivingEntityChange.HorizontalInput:
                 packet.Read(out _horizontalInput);
                 break;
-            case StateChange.LivingEntityVerticalInput:
+            case ELivingEntityChange.VerticalInput:
                 packet.Read(out _verticalInput);
                 break;
-            default:
-                base.DeserializeChange(packet, change);
-                break;
         }
+    }
+
+    public override void FinalizeChanges()
+    {
+        base.FinalizeChanges();
+        _changesCount = 0;
+        for (var i = 0; i < _changes.Length; i++) _changes[i].Item1 = false;
     }
 }

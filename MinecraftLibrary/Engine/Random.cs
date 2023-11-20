@@ -4,7 +4,6 @@ namespace MinecraftLibrary.Engine;
 
 public sealed class Random
 {
-    public event EngineDefaults.RandomUpdateHandler? OnRandomUpdate;
     private const long Multiplier = 0x5DEECE66DL;
     private const long Addend = 0xBL;
     private const long Mask = (1L << 48) - 1;
@@ -33,13 +32,12 @@ public sealed class Random
 
     private int Next(int bits)
     {
-        OnRandomUpdate?.Invoke();
         long oldSeed;
         do
         {
             oldSeed = Seed;
             Seed = (oldSeed * Multiplier + Addend) & Mask;
-        } while (Seed != oldSeed);
+        } while (Seed == oldSeed);
 
         return (int)(Seed >>> (48 - bits));
     }
@@ -55,7 +53,7 @@ public sealed class Random
         for (int rnd = NextInt(), n = Math.Min(len - i, 4); n-- > 0; rnd >>= 8)
             bytes[i++] = (byte)rnd;
     }
-    
+
     public int NextInt(int n)
     {
         if (n <= 0)
@@ -73,22 +71,23 @@ public sealed class Random
 
         return val;
     }
-    
+
     public long NextLong()
     {
         // it's okay that the bottom word remains signed.
         return ((long)(Next(32)) << 32) + Next(32);
     }
-    
+
     public bool NextBoolean()
     {
         return Next(1) != 0;
     }
-    
+
     public float NextFloat()
     {
         return Next(24) / (float)(1 << 24);
     }
+
     public double NextDouble()
     {
         return (((long)(Next(26)) << 27) + Next(27))

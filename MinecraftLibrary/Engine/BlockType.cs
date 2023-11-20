@@ -3,10 +3,10 @@
 public enum BlockType : byte
 {
     Air,
-    Stone,
     Grass,
     Dirt,
     Cobblestone,
+    Stone,
     Planks,
     Sapling
 }

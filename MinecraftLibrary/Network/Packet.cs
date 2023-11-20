@@ -6,31 +6,26 @@ using OpenTK.Mathematics;
 
 namespace MinecraftLibrary.Network;
 
-public class Packet
+public sealed class Packet(PacketHeader header)
 {
-    private PacketHeader Header;
-    private readonly List<byte> Data = new(4096);
-    private int DataPos = 0;
-
-    public Packet(PacketHeader header)
-    {
-        Header = header;
-    }
+    public PacketHeader Header = header;
+    private readonly List<byte> _data = new(4096);
+    private int _dataPos = 0;
 
     public Packet(PacketHeader header, IEnumerable<byte> data) : this(header)
     {
-        Data.AddRange(data);
+        _data.AddRange(data);
     }
 
     public void Write(IEnumerable<byte> data)
     {
-        Data.AddRange(data);
+        _data.AddRange(data);
     }
 
     public void Write(string s)
     {
         Write(Encoding.UTF8.GetBytes(s));
-        Data.Add(0);
+        _data.Add(0);
     }
 
     public void Write(float item)
@@ -65,7 +60,7 @@ public class Packet
 
     public void Write(byte item)
     {
-        Data.Add(item);
+        _data.Add(item);
     }
 
     public void Write(ClientInput data)
@@ -100,18 +95,18 @@ public class Packet
 
     public void Read(out IEnumerable<byte> data, int count)
     {
-        data = Data.GetRange(DataPos, count);
-        DataPos += count;
+        data = _data.GetRange(_dataPos, count);
+        _dataPos += count;
     }
 
     public void Read(out IEnumerable<byte> data)
     {
-        Read(out data, Data.Count - DataPos);
+        Read(out data, _data.Count - _dataPos);
     }
 
     public void Read(out string s)
     {
-        Read(out var data, DataPos - Data.FindIndex(DataPos, b => b == 0) + 1);
+        Read(out var data, _dataPos - _data.FindIndex(_dataPos, b => b == 0) + 1);
         s = Encoding.UTF8.GetString(data.ToArray());
     }
 
@@ -153,7 +148,7 @@ public class Packet
 
     public void Read(out byte item)
     {
-        item = Data[0];
+        item = _data[0];
     }
 
     public void Read(out ClientInput data)
@@ -190,17 +185,27 @@ public class Packet
 
     public byte[] ReadAll()
     {
-        return Data.ToArray();
+        return _data.ToArray();
+    }
+
+    public byte[] ReadLeft()
+    {
+        return _data.GetRange(_dataPos, _data.Count - _dataPos).ToArray();
     }
 
     public void ResetRead()
     {
-        DataPos = 0;
+        _dataPos = 0;
     }
 
     public void Reset()
     {
-        DataPos = 0;
-        Data.Clear();
+        _dataPos = 0;
+        _data.Clear();
+    }
+
+    public void WriteDataLength()
+    {
+        Header.Size = (uint)_data.Count;
     }
 }

@@ -1,51 +1,71 @@
 ﻿using MinecraftLibrary.Input;
 using MinecraftLibrary.Network;
-using OpenTK.Mathematics;
 
 namespace MinecraftLibrary.Engine.States.Entities;
 
 public sealed class PlayerState : LivingEntityState<PlayerState>
 {
-    private float _pitch = 0.0F;
-    private bool _mode = false;
+    private readonly (bool, object)[] _changes = new (bool, object)[Enum.GetValues<EPlayerChange>().Length];
+    private byte _changesCount;
+    private float _pitch;
+    private bool _mode;
     private BlockType _currentSelectedBlock = BlockType.Cobblestone;
     public PlayerInput PlayerInput { get; } = new();
-    
+
     public float Pitch
     {
         get => _pitch;
         set
         {
-            Changes.TryAdd((ushort)StateChange.PlayerPitch, _pitch);
-            TriggerEntityUpdate();
+            IsDirty = true;
+            if (!_changes[(byte)EPlayerChange.Pitch].Item1)
+            {
+                _changes[(byte)EPlayerChange.Pitch].Item1 = true;
+                _changes[(byte)EPlayerChange.Pitch].Item2 = _pitch;
+                _changesCount++;
+            }
+
             _pitch = value;
         }
     }
-    
+
     public bool Mode
     {
         get => _mode;
         set
         {
-            Changes.TryAdd((ushort)StateChange.PlayerMode, _mode);
-            TriggerEntityUpdate();
+            IsDirty = true;
+            if (!_changes[(byte)EPlayerChange.Mode].Item1)
+            {
+                _changes[(byte)EPlayerChange.Mode].Item1 = true;
+                _changes[(byte)EPlayerChange.Mode].Item2 = _mode;
+                _changesCount++;
+            }
+
             _mode = value;
         }
     }
-    
+
     public BlockType CurrentSelectedBlock
     {
         get => _currentSelectedBlock;
         set
         {
-            Changes.TryAdd((ushort)StateChange.PlayerCurrentSelectedBlock, _currentSelectedBlock);
-            TriggerEntityUpdate();
+            IsDirty = true;
+            if (!_changes[(byte)EPlayerChange.CurrentSelectedBlock].Item1)
+            {
+                _changes[(byte)EPlayerChange.CurrentSelectedBlock].Item1 = true;
+                _changes[(byte)EPlayerChange.CurrentSelectedBlock].Item2 = _currentSelectedBlock;
+                _changesCount++;
+            }
+
             _currentSelectedBlock = value;
         }
     }
-    
+
     public PlayerState(ushort id) : base(id, EntityType.Player)
     {
+        for (var i = 0; i < _changes.Length; i++) _changes[i] = (false, id);
     }
 
     public override void Serialize(Packet packet)
@@ -67,77 +87,116 @@ public sealed class PlayerState : LivingEntityState<PlayerState>
         PlayerInput.Deserialize(packet);
     }
 
-    protected override void SerializeChangeToChangePacket(Packet changePacket, ushort change)
+    public override void SerializeChangesToChangePacket(Packet changePacket)
     {
-        switch ((StateChange)change)
+        base.SerializeChangesToChangePacket(changePacket);
+        changePacket.Write(_changesCount);
+        for (byte i = 0; i < _changes.Length; i++)
+            if (_changes[i].Item1)
+            {
+                changePacket.Write(i);
+                SerializeChangeToChangePacket(changePacket, i);
+            }
+    }
+
+    private void SerializeChangeToChangePacket(Packet changePacket, byte change)
+    {
+        switch ((EPlayerChange)change)
         {
-            case StateChange.PlayerPitch:
+            case EPlayerChange.Pitch:
                 changePacket.Write(Pitch);
                 break;
-            case StateChange.PlayerMode:
+            case EPlayerChange.Mode:
                 changePacket.Write(Mode);
                 break;
-            case StateChange.PlayerCurrentSelectedBlock:
+            case EPlayerChange.CurrentSelectedBlock:
                 changePacket.Write((byte)CurrentSelectedBlock);
                 break;
-            case StateChange.PlayerInput:
+            case EPlayerChange.Input:
                 PlayerInput.Serialize(changePacket);
                 break;
-            default:
-                base.SerializeChangeToChangePacket(changePacket, change);
+        }
+    }
+
+    public override void SerializeChangesToRevertPacket(Packet revertPacket)
+    {
+        base.SerializeChangesToRevertPacket(revertPacket);
+        revertPacket.Write(_changesCount);
+        for (byte i = 0; i < _changes.Length; i++)
+            if (_changes[i].Item1)
+            {
+                revertPacket.Write(i);
+                SerializeChangeToRevertPacket(revertPacket, i);
+            }
+    }
+
+    private void SerializeChangeToRevertPacket(Packet revertPacket, byte change)
+    {
+        switch ((EPlayerChange)change)
+        {
+            case EPlayerChange.Pitch:
+                revertPacket.Write((float)_changes[change].Item2);
+                break;
+            case EPlayerChange.Mode:
+                revertPacket.Write((bool)_changes[change].Item2);
+                break;
+            case EPlayerChange.CurrentSelectedBlock:
+                revertPacket.Write((byte)_changes[change].Item2);
+                break;
+            case EPlayerChange.Input:
+                ((PlayerInput)_changes[change].Item2).Serialize(revertPacket);
                 break;
         }
     }
 
-    protected override void SerializeChangeToRevertPacket(Packet revertPacket, ushort change)
+    public override void DeserializeChanges(Packet changePacket)
     {
-        switch ((StateChange)change)
+        base.DeserializeChanges(changePacket);
+        changePacket.Read(out byte changeCount);
+        for (var i = 0; i < changeCount; i++)
         {
-            case StateChange.PlayerPitch:
-                revertPacket.Write((float)Changes[change]);
-                break;
-            case StateChange.PlayerMode:
-                revertPacket.Write((bool)Changes[change]);
-                break;
-            case StateChange.PlayerCurrentSelectedBlock:
-                revertPacket.Write((byte)CurrentSelectedBlock);
-                break;
-            case StateChange.PlayerInput:
-                ((PlayerInput)Changes[change]).Serialize(revertPacket);
-                break;
-            default:
-                base.SerializeChangeToRevertPacket(revertPacket, change);
-                break;
+            changePacket.Read(out byte change);
+            DeserializeChange(changePacket, change);
         }
     }
 
-    protected override void DeserializeChange(Packet packet, ushort change)
+    private void DeserializeChange(Packet packet, byte change)
     {
-        switch ((StateChange)change)
+        switch ((EPlayerChange)change)
         {
-            case StateChange.PlayerMode:
+            case EPlayerChange.Mode:
                 packet.Read(out _mode);
                 break;
-            case StateChange.PlayerPitch:
+            case EPlayerChange.Pitch:
                 packet.Read(out _pitch);
                 break;
-            case StateChange.PlayerCurrentSelectedBlock:
+            case EPlayerChange.CurrentSelectedBlock:
                 packet.Read(out byte blockType);
                 _currentSelectedBlock = (BlockType)blockType;
                 break;
-            case StateChange.PlayerInput:
+            case EPlayerChange.Input:
                 PlayerInput.Deserialize(packet);
-                break;
-            default:
-                base.DeserializeChange(packet, change);
                 break;
         }
     }
-    
+
+    public override void FinalizeChanges()
+    {
+        base.FinalizeChanges();
+        _changesCount = 0;
+        for (var i = 0; i < _changes.Length; i++) _changes[i].Item1 = false;
+    }
+
     public void ApplyClientInput(ClientInput clientInput)
     {
-        Changes.TryAdd((ushort)StateChange.PlayerInput, PlayerInput);
-        TriggerEntityUpdate();
+        IsDirty = true;
+        if (!_changes[(byte)EPlayerChange.Input].Item1)
+        {
+            _changes[(byte)EPlayerChange.Input].Item1 = true;
+            _changes[(byte)EPlayerChange.Input].Item2 = PlayerInput;
+            _changesCount++;
+        }
+
         PlayerInput.ApplyClientInput(clientInput);
     }
 }
