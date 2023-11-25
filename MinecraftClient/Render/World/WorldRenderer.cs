@@ -1,19 +1,20 @@
 using MinecraftClient.Render.Entities.Player;
 using MinecraftClient.Render.Shaders;
+using MinecraftClient.Render.Textures;
 using MinecraftClient.Render.World.Block;
+using MinecraftLibrary.Engine;
 using MinecraftLibrary.Engine.States.World;
 using OpenTK.Graphics.OpenGL4;
-using OpenTK.Mathematics;
+using OpenTK.Windowing.Common.Input;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace MinecraftClient.Render.World;
 
-public class WorldRenderer
+public sealed class WorldRenderer
 {
     private int FogsBuffer;
     private HashSet<ChunkRenderer> _chunkRenderers = new();
-    private HashSet<ChunkRenderer> _dirtyChunkRenderers = new();
-
-    public static readonly BlockRenderer[] BlockRenderers = new[] { new AirBlockRenderer() };
+    
     private void InitFog()
     {
         GL.CreateBuffers(1, out FogsBuffer);
@@ -29,12 +30,19 @@ public class WorldRenderer
     public WorldRenderer()
     {
         MinecraftLibrary.Engine.World.GetInstance()!.OnChunkAdded += OnChunkAdded;
-        Shader.MainShader.SetUnsignedInt("worldTime", (uint)MinecraftLibrary.Engine.World.GetInstance()!.State.WorldTime);
+        Shader.MainShader.Use();
+        //Shader.MainShader.SetUnsignedInt("worldTime", (uint)MinecraftLibrary.Engine.World.GetInstance()!.GetWorldTime());
+        Shader.MainShader.SetUnsignedInt("chunkHeight", EngineDefaults.ChunkHeight);
+        Shader.MainShader.SetUnsignedInt("chunkDepth", EngineDefaults.ChunkDepth);
         InitFog();
+        BlockRenderer.Setup();
+        Texture.SetupTextures();
     }
 
     ~WorldRenderer()
     {
+        BlockRenderer.Terminate();
+        Texture.Terminate();
         GL.DeleteBuffer(FogsBuffer);
     }
 
@@ -42,12 +50,6 @@ public class WorldRenderer
     {
         var renderer = new ChunkRenderer(state);
         _chunkRenderers.Add(renderer);
-        renderer.OnChunkRenderDirty += OnChunkRenderDirty;
-    }
-
-    private void OnChunkRenderDirty(ChunkRenderer renderer)
-    {
-        _dirtyChunkRenderers.Add(renderer);
     }
 
     public void HandleWindowResize(int height, int width)
@@ -56,11 +58,22 @@ public class WorldRenderer
         Camera.GetInstance().SetAspectRatio((float)width / height);
     }
 
+    private int test = 0;
+
     public void Render()
     {
         var camera = Camera.GetInstance();
         var cameraFrustum = camera.GetFrustum();
         Shader.MainShader.SetMat4("view", camera.GetViewMatrix());
         Shader.MainShader.SetMat4("projection", camera.GetProjectionMatrix());
+        var dirtyChunks = _chunkRenderers.Where(static renderer => renderer.IsDirty());
+        using var dirtyChunksEnumerator = dirtyChunks.GetEnumerator();
+        if (test != 0)
+            foreach (var renderer in _chunkRenderers)
+                renderer.Render();
+        else
+            for (var i = 0; i < 8 && dirtyChunksEnumerator.MoveNext(); i++)
+                dirtyChunksEnumerator.Current.UpdateRenderer();
+        test++;
     }
 }

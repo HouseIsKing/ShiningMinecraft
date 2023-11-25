@@ -1,109 +1,172 @@
 ﻿using System.Runtime.InteropServices;
 using MinecraftClient.Render.Shaders;
 using MinecraftLibrary.Engine;
+using MinecraftLibrary.Engine.Blocks;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using Buffer = System.Buffer;
 
 namespace MinecraftClient.Render.World;
 
-public class ChunkTessellator : Tessellator
+public sealed class ChunkTessellator : Tessellator
 {
-    private IntPtr VboPointer;
-    private IntPtr EboPointer;
+    private IntPtr _vboPointer;
+    private IntPtr _eboPointer;
+    private readonly int[] _trianglesCount = { 0, 0, 0, 0, 0, 0 };
+    private readonly IntPtr[] _trianglesOffset = { 0, 0, 0, 0, 0, 0 };
 
     private static readonly uint Vao;
-    private static readonly uint VboPos;
-    private readonly uint _vbo;
-    private readonly uint[] _vbos;
 
     static ChunkTessellator()
     {
         GL.CreateVertexArrays(1, out Vao);
-        GL.CreateBuffers(1, out VboPos);
-        GL.NamedBufferStorage(VboPos, EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * 3 * 3 * sizeof(float), GetVertexesPos(), BufferStorageFlags.None);
-        GL.VertexArrayAttribFormat(Vao, 0, 3, VertexAttribType.Float, false, 0);
-        GL.VertexArrayAttribFormat(Vao, 1, 2, VertexAttribType.Float, false, 0);
-        GL.VertexArrayAttribFormat(Vao, 2, 4, VertexAttribType.Float, false, 8);
-        GL.VertexArrayAttribIFormat(Vao, 3, 1, VertexAttribIntegerType.UnsignedShort, 24);
-        GL.VertexArrayAttribIFormat(Vao, 4, 1, VertexAttribIntegerType.UnsignedByte, 26);
-        GL.VertexArrayAttribIFormat(Vao, 5, 1, VertexAttribIntegerType.UnsignedByte, 27);
-        GL.VertexArrayAttribBinding(Vao, 0, 0);
-        GL.VertexArrayAttribBinding(Vao, 1, 1);
-        GL.VertexArrayAttribBinding(Vao, 2, 1);
-        GL.VertexArrayAttribBinding(Vao, 3, 1);
-        GL.VertexArrayAttribBinding(Vao, 4, 1);
-        GL.VertexArrayAttribBinding(Vao, 5, 1);
-        GL.VertexArrayVertexBuffer(Vao, 0, VboPos, 0, 3 * sizeof(float));
         GL.EnableVertexArrayAttrib(Vao, 0);
-        GL.EnableVertexArrayAttrib(Vao, 1);
-        GL.EnableVertexArrayAttrib(Vao, 2);
-        GL.EnableVertexArrayAttrib(Vao, 3);
-        GL.EnableVertexArrayAttrib(Vao, 4);
-        GL.EnableVertexArrayAttrib(Vao, 5);
+        GL.VertexArrayAttribFormat(Vao, 0, 1, VertexAttribType.UnsignedInt, false, 0);
+        GL.VertexArrayAttribBinding(Vao, 0, 0);
+        GL.BindVertexArray(Vao);
     }
 
     public static void Terminate()
     {
-        GL.DeleteBuffer(VboPos);
         GL.DeleteVertexArray(Vao);
-    }
-
-    private static Vector3[] GetVertexesPos()
-    {
-        var result = new Vector3[EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * 3];
-        for (var i = 0; i < EngineDefaults.ChunkWidth; i++)
-        for (var j = 0; j < EngineDefaults.ChunkHeight; j++)
-        for (var k = 0; k < EngineDefaults.ChunkDepth; k++)
-        {
-            Vector3 pos = new(i, j, k);
-            result[i * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth + j * EngineDefaults.ChunkDepth + k] = pos;
-            result[
-                i * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth + j * EngineDefaults.ChunkDepth + k +
-                1] = pos;
-            result[i * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth + j * EngineDefaults.ChunkDepth +
-                   k + 2] = pos;
-        }
-
-        return result;
     }
 
     public ChunkTessellator()
     {
-        GL.CreateBuffers(1, out _vbo);
-        _vbos = new[] { _vbo, _vbo, _vbo, _vbo, _vbo };
-        GL.NamedBufferStorage(_vbo, EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * 3 * Marshal.SizeOf<ChunkVertex>(), IntPtr.Zero, BufferStorageFlags.MapWriteBit);
-        VboPointer = GL.MapNamedBuffer(_vbo, BufferAccess.WriteOnly);
-        GL.NamedBufferStorage(Ebo, EngineDefaults.ChunkWidth / 2 * EngineDefaults.ChunkHeight / 2 * EngineDefaults.ChunkDepth / 2 * 6 * 6 * sizeof(ushort), IntPtr.Zero, BufferStorageFlags.MapWriteBit);
-        EboPointer = GL.MapNamedBuffer(Ebo, BufferAccess.WriteOnly);
-    }
-
-    ~ChunkTessellator()
-    {
-        GL.UnmapNamedBuffer(_vbo);
-        GL.UnmapNamedBuffer(Ebo);
-        GL.DeleteBuffer(_vbo);
+        GL.NamedBufferStorage(Vbo, EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * 4 * 4, IntPtr.Zero, BufferStorageFlags.MapWriteBit);
+        GL.NamedBufferStorage(Ebo, EngineDefaults.ChunkWidth / 2 * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * 36 * sizeof(uint), IntPtr.Zero, BufferStorageFlags.MapWriteBit);
     }
 
     public override void Draw()
     {
+        if (TrianglesCount == 0) return;
         Shader.MainShader.SetMat4("transformationMatrix", ModelMatrix);
-        GL.VertexArrayVertexBuffer(Vao, 1u, _vbo, 0, Marshal.SizeOf<ChunkVertex>());
+        GL.VertexArrayVertexBuffer(Vao, 0u, Vbo, 0, sizeof(uint));
         GL.VertexArrayElementBuffer(Vao, Ebo);
-        GL.DrawElements(PrimitiveType.Triangles, TrianglesCount, DrawElementsType.UnsignedShort, 0);
+        GL.MultiDrawElements(PrimitiveType.Triangles, _trianglesCount, DrawElementsType.UnsignedInt, _trianglesOffset, 6);
     }
 
-    public void SetVertex(ushort index, byte offset, ChunkVertex vertex)
+    public void SetTriangles(uint[] triangles0, uint[] triangles1, uint[] triangles2, uint[] triangles3, uint[] triangles4, uint[] triangles5)
     {
-        Marshal.Copy(ChunkVertex.ToBytes(vertex), 0, VboPointer + (index * 3 + offset) * Marshal.SizeOf<ChunkVertex>(),
-            Marshal.SizeOf<ChunkVertex>());
+        _eboPointer = GL.MapNamedBuffer(Ebo, BufferAccess.WriteOnly);
+        _trianglesCount[0] = triangles0.Length * 6;
+        _trianglesCount[1] = triangles1.Length * 6;
+        _trianglesCount[2] = triangles2.Length * 6;
+        _trianglesCount[3] = triangles3.Length * 6;
+        _trianglesCount[4] = triangles4.Length * 6;
+        _trianglesCount[5] = triangles5.Length * 6;
+        _trianglesOffset[0] = IntPtr.Zero;
+        _trianglesOffset[1] = _trianglesCount[0] * sizeof(uint);
+        _trianglesOffset[2] = (_trianglesCount[0] + _trianglesCount[1]) * sizeof(uint);
+        _trianglesOffset[3] = (_trianglesCount[0] + _trianglesCount[1] + _trianglesCount[2]) * sizeof(uint);
+        _trianglesOffset[4] = (_trianglesCount[0] + _trianglesCount[1] + _trianglesCount[2] + _trianglesCount[3]) * sizeof(uint);
+        _trianglesOffset[5] = (_trianglesCount[0] + _trianglesCount[1] + _trianglesCount[2] + _trianglesCount[3] + _trianglesCount[4]) * sizeof(uint);
+        for (var i = 0; i < triangles0.Length; i++)
+        {
+            var bytes0 = BitConverter.GetBytes(triangles0[i] * 4);
+            var bytes1 = BitConverter.GetBytes(triangles0[i] * 4 + 1);
+            var bytes2 = BitConverter.GetBytes(triangles0[i] * 4 + 2);
+            var bytes3 = BitConverter.GetBytes(triangles0[i] * 4 + 3);
+            var offsetHelper = i * 6;
+            Marshal.Copy(bytes0, 0, _eboPointer + offsetHelper * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes3, 0, _eboPointer + (offsetHelper + 3) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
+        }
+        for (var i = 0; i < triangles1.Length; i++)
+        {
+            var bytes0 = BitConverter.GetBytes(triangles1[i] * 4);
+            var bytes1 = BitConverter.GetBytes(triangles1[i] * 4 + 1);
+            var bytes2 = BitConverter.GetBytes(triangles1[i] * 4 + 2);
+            var bytes3 = BitConverter.GetBytes(triangles1[i] * 4 + 3);
+            var offsetHelper = i * 6 + _trianglesCount[0];
+            Marshal.Copy(bytes0, 0, _eboPointer + offsetHelper * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes3, 0, _eboPointer + (offsetHelper + 3) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
+        }
+        for (var i = 0; i < triangles2.Length; i++)
+        {
+            var bytes0 = BitConverter.GetBytes(triangles2[i] * 4);
+            var bytes1 = BitConverter.GetBytes(triangles2[i] * 4 + 1);
+            var bytes2 = BitConverter.GetBytes(triangles2[i] * 4 + 2);
+            var bytes3 = BitConverter.GetBytes(triangles2[i] * 4 + 3);
+            var offsetHelper = i * 6 + _trianglesCount[0] + _trianglesCount[1];
+            Marshal.Copy(bytes0, 0, _eboPointer + offsetHelper * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes3, 0, _eboPointer + (offsetHelper + 3) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
+        }
+        for (var i = 0; i < triangles3.Length; i++)
+        {
+            var bytes0 = BitConverter.GetBytes(triangles3[i] * 4);
+            var bytes1 = BitConverter.GetBytes(triangles3[i] * 4 + 1);
+            var bytes2 = BitConverter.GetBytes(triangles3[i] * 4 + 2);
+            var bytes3 = BitConverter.GetBytes(triangles3[i] * 4 + 3);
+            var offsetHelper = i * 6 + _trianglesCount[0] + _trianglesCount[1] + _trianglesCount[2];
+            Marshal.Copy(bytes0, 0, _eboPointer + offsetHelper * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes3, 0, _eboPointer + (offsetHelper + 3) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
+        }
+        for (var i = 0; i < triangles4.Length; i++)
+        {
+            var bytes0 = BitConverter.GetBytes(triangles4[i] * 4);
+            var bytes1 = BitConverter.GetBytes(triangles4[i] * 4 + 1);
+            var bytes2 = BitConverter.GetBytes(triangles4[i] * 4 + 2);
+            var bytes3 = BitConverter.GetBytes(triangles4[i] * 4 + 3);
+            var offsetHelper = i * 6 + _trianglesCount[0] + _trianglesCount[1] + _trianglesCount[2] + _trianglesCount[3];
+            Marshal.Copy(bytes0, 0, _eboPointer + offsetHelper * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes3, 0, _eboPointer + (offsetHelper + 3) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
+        }
+        for (var i = 0; i < triangles5.Length; i++)
+        {
+            var bytes0 = BitConverter.GetBytes(triangles5[i] * 4);
+            var bytes1 = BitConverter.GetBytes(triangles5[i] * 4 + 1);
+            var bytes2 = BitConverter.GetBytes(triangles5[i] * 4 + 2);
+            var bytes3 = BitConverter.GetBytes(triangles5[i] * 4 + 3);
+            var offsetHelper = i * 6 + _trianglesCount[0] + _trianglesCount[1] + _trianglesCount[2] + _trianglesCount[3] + _trianglesCount[4];
+            Marshal.Copy(bytes0, 0, _eboPointer + offsetHelper * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes3, 0, _eboPointer + (offsetHelper + 3) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
+        }
+        TrianglesCount = _trianglesCount[0] + _trianglesCount[1] + _trianglesCount[2] + _trianglesCount[3] + _trianglesCount[4] + _trianglesCount[5];
+        GL.UnmapNamedBuffer(Ebo);
     }
 
-    public void SetTriangles(ushort[] triangles)
+    public void BeginUpdateVertex()
     {
-        TrianglesCount = triangles.Length;
-        var bytes = new byte[triangles.Length * sizeof(ushort)];
-        Buffer.BlockCopy(triangles, 0, bytes, 0, bytes.Length);
-        Marshal.Copy(bytes, 0, EboPointer, triangles.Length);
+        _vboPointer = GL.MapNamedBuffer(Vbo, BufferAccess.WriteOnly);
+    }
+
+    public void EndUpdateVertex()
+    {
+        GL.UnmapNamedBuffer(Vbo);
+    }
+
+    public void SetVertex(ushort index, BlockType blockType, byte light)
+    {
+        var constructedVertex = (uint)blockType << 16;
+        constructedVertex |= (uint)light << 10;
+        var bits = BitConverter.GetBytes(constructedVertex);
+        Marshal.Copy(bits, 0, _vboPointer + index * 4 * sizeof(uint), sizeof(uint));
+        Marshal.Copy(bits, 0, _vboPointer + (index * 4 + 1) * sizeof(uint), sizeof(uint));
+        Marshal.Copy(bits, 0, _vboPointer + (index * 4 + 2) * sizeof(uint), sizeof(uint));
+        Marshal.Copy(bits, 0, _vboPointer + (index * 4 + 3) * sizeof(uint), sizeof(uint));
     }
 }

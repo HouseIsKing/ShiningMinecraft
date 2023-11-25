@@ -12,9 +12,9 @@ public class World
 {
     private static World? _instance;
     
-    private const int WorldWidth = 256;
-    private const int WorldHeight = 64;
-    private const int WorldDepth = 256;
+    private const int WorldWidth = 16;
+    private const int WorldHeight = 16;
+    private const int WorldDepth = 16;
     private readonly SortedList<ushort, Player> _players = new();
     private readonly SortedList<ushort, BlockParticleEntity> _blockParticles = new();
     private readonly List<PlayerState> _playersToSpawn = new();
@@ -38,8 +38,6 @@ public class World
 
         State = new WorldState(seed);
         _instance = this;
-        GenerateChunks(WorldWidth / EngineDefaults.ChunkWidth, WorldHeight / EngineDefaults.ChunkHeight,
-            WorldDepth / EngineDefaults.ChunkDepth);
     }
 
     public World()
@@ -48,8 +46,6 @@ public class World
 
         State = new WorldState();
         _instance = this;
-        GenerateChunks(WorldWidth / EngineDefaults.ChunkWidth, WorldHeight / EngineDefaults.ChunkHeight,
-            WorldDepth / EngineDefaults.ChunkDepth);
     }
 
     ~World()
@@ -138,6 +134,8 @@ public class World
     
     public void LoadWorld()
     {
+        GenerateChunks(WorldWidth / EngineDefaults.ChunkWidth, WorldHeight / EngineDefaults.ChunkHeight,
+            WorldDepth / EngineDefaults.ChunkDepth);
         GZipStream stream = new(File.OpenRead("world.dat"), CompressionMode.Decompress);
         State.LoadWorld(stream);
         stream.Close();
@@ -185,11 +183,11 @@ public class World
     public Block GetBlockAt(Vector3i pos)
     {
         if (IsOutOfBounds(pos))
-            return EngineDefaults.Blocks[(int)BlockType.Air];
+            return Block.GetBlock(BlockType.Air);
 
         var chunk = GetChunkAt(pos);
         var indexVector = pos - chunk.ChunkPosition;
-        return EngineDefaults.Blocks[(int)chunk.GetBlockAt(EngineDefaults.GetIndexFromVector(indexVector))];
+        return Block.GetBlock(chunk.GetBlockAt(EngineDefaults.GetIndexFromVector(indexVector)));
     }
 
     public List<Box3> GetBlocksColliding(Box3 collider)
@@ -255,6 +253,8 @@ public class World
 
     public void GenerateLevel()
     {
+        GenerateChunks(WorldWidth / EngineDefaults.ChunkWidth, WorldHeight / EngineDefaults.ChunkHeight,
+            WorldDepth / EngineDefaults.ChunkDepth);
         var heightMap1 = new PerlinNoise(0);
         var heightMap2 = new PerlinNoise(1);
         var firstHeightMap = heightMap1.Generate(WorldWidth, WorldDepth);
@@ -326,7 +326,7 @@ public class World
         var currentLight = State.GetLight(blockPlaced.Xz);
         if (blockPlaced.Y < currentLight) return;
         
-        if (EngineDefaults.Blocks[(int)type].IsBlockingLight())
+        if (Block.GetBlock(type).IsBlockingLight())
         {
             State.SetLight(blockPlaced.Xz, (byte)blockPlaced.Y);
         }
@@ -348,7 +348,7 @@ public class World
     {
         if (IsOutOfBounds(pos)) return 0;
 
-        return (byte)(State.GetLight(pos.Xz) > pos.Y ? 1u : 0u);
+        return (byte)(State.GetLight(pos.Xz) > pos.Y ? 1 : 0);
     }
 
     public Random GetWorldRandom()

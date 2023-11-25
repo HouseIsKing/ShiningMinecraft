@@ -18,12 +18,6 @@ public static class EngineDefaults
     public const int PacketHistorySize = 20;
     public static readonly Vector3 PlayerSize = new(0.3f, 0.9f, 0.3f);
     public static readonly Vector3 ParticleSize = new(0.1f);
-
-    public static readonly Block[] Blocks = new Block[]
-    {
-        new AirBlock(), new GrassBlock(), new DirtBlock(), new CobblestoneBlock(), new StoneBlock(), new PlanksBlock(),
-        new SaplingBlock()
-    };
     public static IEnumerable<byte> GetBytes(ClientInput data)
     {
         var size = Marshal.SizeOf(data);
@@ -167,16 +161,6 @@ public static class EngineDefaults
     
     public delegate void TickStartHandler();
     public delegate void TickEndHandler();
-
-    public delegate void ChunkUpdateHandler(Vector3i chunkPosition, ushort change, BlockType type);
-
-    //public delegate void LightUpdateHandler(Vector2i lightPosition);
-
-    public delegate void EntityUpdateHandler(ushort entityId);
-
-    public delegate void RandomUpdateHandler();
-
     public delegate void ChunkAddedHandler(ChunkState state);
-
     public delegate void PlayerAddedHandler(PlayerState state);
 }

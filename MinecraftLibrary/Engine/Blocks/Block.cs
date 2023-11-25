@@ -1,12 +1,19 @@
-﻿using MinecraftLibrary.Network;
-using MinecraftLibrary.Engine;
-using MinecraftLibrary.Engine.States.Entities;
-using OpenTK.Mathematics;
+﻿using OpenTK.Mathematics;
 
 namespace MinecraftLibrary.Engine.Blocks;
 
 public class Block
 {
+    private static readonly Block[] Blocks =
+    {
+        new AirBlock(), new GrassBlock(), new DirtBlock(), new CobblestoneBlock(), new StoneBlock(), new PlanksBlock(),
+        new SaplingBlock()
+    };
+    
+    public static Block GetBlock(BlockType type)
+    {
+        return Blocks[(int)type];
+    }
     public BlockType Type { get; private set; }
     public Box3 BlockBounds { get; private set; }
 

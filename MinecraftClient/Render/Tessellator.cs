@@ -6,6 +6,8 @@ namespace MinecraftClient.Render;
 public abstract class Tessellator
 {
     protected uint Ebo { get; }
+    
+    protected uint Vbo { get; }
 
     protected int TrianglesCount = 0;
     
@@ -22,6 +24,8 @@ public abstract class Tessellator
         Parent = this;
         GL.CreateBuffers(1, out uint helper);
         Ebo = helper;
+        GL.CreateBuffers(1, out helper);
+        Vbo = helper;
     }
 
     protected Tessellator(Tessellator parent)
@@ -29,11 +33,14 @@ public abstract class Tessellator
         Parent = parent;
         GL.CreateBuffers(1, out uint helper);
         Ebo = helper;
+        GL.CreateBuffers(1, out helper);
+        Vbo = helper;
     }
     
     ~Tessellator()
     {
         GL.DeleteBuffer(Ebo);
+        GL.DeleteBuffer(Vbo);
     }
 
     public abstract void Draw();

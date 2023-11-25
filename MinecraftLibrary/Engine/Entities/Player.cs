@@ -110,7 +110,7 @@ public sealed class Player : LivingEntity<PlayerState>
 
     private void PlaceBlock()
     {
-        var blockToPlace = EngineDefaults.Blocks[(int)State.CurrentSelectedBlock];
+        var blockToPlace = Block.GetBlock(State.CurrentSelectedBlock);
         var blockBox = blockToPlace.BlockBounds;
         switch (_hitFace)
         {

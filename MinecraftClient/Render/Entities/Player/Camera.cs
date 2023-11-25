@@ -21,7 +21,7 @@ public class Camera
     public float Yaw;
     public Vector3 Position;
     
-    private static readonly Camera Instance = new Camera(new Vector3(0, 0, 0), 1280.0f/720.0f);
+    private static readonly Camera Instance = new Camera(new Vector3(0, 16.1f, 0), 1280.0f / 720.0f);
     
     public static Camera GetInstance()
     {
