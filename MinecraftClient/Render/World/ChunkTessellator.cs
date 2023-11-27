@@ -21,7 +21,7 @@ public sealed class ChunkTessellator : Tessellator
     {
         GL.CreateVertexArrays(1, out Vao);
         GL.EnableVertexArrayAttrib(Vao, 0);
-        GL.VertexArrayAttribFormat(Vao, 0, 1, VertexAttribType.UnsignedInt, false, 0);
+        GL.VertexArrayAttribIFormat(Vao, 0, 1, VertexAttribIntegerType.UnsignedInt, 0);
         GL.VertexArrayAttribBinding(Vao, 0, 0);
         GL.BindVertexArray(Vao);
     }
@@ -41,7 +41,7 @@ public sealed class ChunkTessellator : Tessellator
     {
         if (TrianglesCount == 0) return;
         Shader.MainShader.SetMat4("transformationMatrix", ModelMatrix);
-        GL.VertexArrayVertexBuffer(Vao, 0u, Vbo, 0, sizeof(uint));
+        GL.VertexArrayVertexBuffer(Vao, 0, Vbo, 0, sizeof(uint));
         GL.VertexArrayElementBuffer(Vao, Ebo);
         GL.MultiDrawElements(PrimitiveType.Triangles, _trianglesCount, DrawElementsType.UnsignedInt, _trianglesOffset, 6);
     }
@@ -69,11 +69,11 @@ public sealed class ChunkTessellator : Tessellator
             var bytes3 = BitConverter.GetBytes(triangles0[i] * 4 + 3);
             var offsetHelper = i * 6;
             Marshal.Copy(bytes0, 0, _eboPointer + offsetHelper * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
             Marshal.Copy(bytes3, 0, _eboPointer + (offsetHelper + 3) * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
         }
         for (var i = 0; i < triangles1.Length; i++)
         {
@@ -97,11 +97,11 @@ public sealed class ChunkTessellator : Tessellator
             var bytes3 = BitConverter.GetBytes(triangles2[i] * 4 + 3);
             var offsetHelper = i * 6 + _trianglesCount[0] + _trianglesCount[1];
             Marshal.Copy(bytes0, 0, _eboPointer + offsetHelper * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
             Marshal.Copy(bytes3, 0, _eboPointer + (offsetHelper + 3) * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
         }
         for (var i = 0; i < triangles3.Length; i++)
         {
@@ -139,11 +139,11 @@ public sealed class ChunkTessellator : Tessellator
             var bytes3 = BitConverter.GetBytes(triangles5[i] * 4 + 3);
             var offsetHelper = i * 6 + _trianglesCount[0] + _trianglesCount[1] + _trianglesCount[2] + _trianglesCount[3] + _trianglesCount[4];
             Marshal.Copy(bytes0, 0, _eboPointer + offsetHelper * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 1) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 2) * sizeof(uint), sizeof(uint));
             Marshal.Copy(bytes3, 0, _eboPointer + (offsetHelper + 3) * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
-            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes1, 0, _eboPointer + (offsetHelper + 4) * sizeof(uint), sizeof(uint));
+            Marshal.Copy(bytes2, 0, _eboPointer + (offsetHelper + 5) * sizeof(uint), sizeof(uint));
         }
         TrianglesCount = _trianglesCount[0] + _trianglesCount[1] + _trianglesCount[2] + _trianglesCount[3] + _trianglesCount[4] + _trianglesCount[5];
         GL.UnmapNamedBuffer(Ebo);
@@ -160,7 +160,7 @@ public sealed class ChunkTessellator : Tessellator
     }
 
     public void SetVertex(ushort index, BlockType blockType, byte light)
-    {
+    { 
         var constructedVertex = (uint)blockType << 16;
         constructedVertex |= (uint)light << 10;
         var bits = BitConverter.GetBytes(constructedVertex);

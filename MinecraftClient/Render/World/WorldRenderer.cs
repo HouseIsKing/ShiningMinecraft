@@ -58,8 +58,6 @@ public sealed class WorldRenderer
         Camera.GetInstance().SetAspectRatio((float)width / height);
     }
 
-    private int test = 0;
-
     public void Render()
     {
         var camera = Camera.GetInstance();
@@ -68,12 +66,7 @@ public sealed class WorldRenderer
         Shader.MainShader.SetMat4("projection", camera.GetProjectionMatrix());
         var dirtyChunks = _chunkRenderers.Where(static renderer => renderer.IsDirty());
         using var dirtyChunksEnumerator = dirtyChunks.GetEnumerator();
-        if (test != 0)
-            foreach (var renderer in _chunkRenderers)
-                renderer.Render();
-        else
-            for (var i = 0; i < 8 && dirtyChunksEnumerator.MoveNext(); i++)
-                dirtyChunksEnumerator.Current.UpdateRenderer();
-        test++;
+        for (var i = 0; i < 8 && dirtyChunksEnumerator.MoveNext(); i++) dirtyChunksEnumerator.Current.UpdateRenderer();
+        foreach (var renderer in _chunkRenderers) renderer.Render();
     }
 }

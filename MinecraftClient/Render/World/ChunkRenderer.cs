@@ -31,16 +31,10 @@ public class ChunkRenderer
         var pos = EngineDefaults.GetVectorFromIndex(index) + _state.ChunkPosition;
         var world = MinecraftLibrary.Engine.World.GetInstance()!;
         var result = world.GetBrightnessAt(pos + Vector3i.UnitY);
-        result <<= 1;
-        result |= world.GetBrightnessAt(pos - Vector3i.UnitY);
-        result <<= 1;
-        result |= world.GetBrightnessAt(pos + Vector3i.UnitX);
-        result <<= 1;
-        result |= world.GetBrightnessAt(pos - Vector3i.UnitX);
-        result <<= 1;
-        result |= world.GetBrightnessAt(pos + Vector3i.UnitZ);
-        result <<= 1;
-        result |= world.GetBrightnessAt(pos - Vector3i.UnitZ);
+        result |= (byte)(world.GetBrightnessAt(pos + Vector3i.UnitX) << 2);
+        result |= (byte)(world.GetBrightnessAt(pos - Vector3i.UnitX) << 3);
+        result |= (byte)(world.GetBrightnessAt(pos + Vector3i.UnitZ) << 4);
+        result |= (byte)(world.GetBrightnessAt(pos - Vector3i.UnitZ) << 5);
         return result;
     }
 

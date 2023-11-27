@@ -35,6 +35,7 @@ public abstract class MinecraftClient : GameWindow
         GL.ClearDepth(1.0f);
         GL.DepthFunc(DepthFunction.Lequal);
         GL.Enable(EnableCap.DepthTest);
+        GL.Enable(EnableCap.CullFace);
         World.GenerateLevel();
         Console.WriteLine("Done loading world");
     }

@@ -6,4 +6,9 @@ public sealed class AirBlock() : Block(BlockType.Air)
     {
         return false;
     }
+
+    public override bool IsBlockingLight()
+    {
+        return false;
+    }
 }

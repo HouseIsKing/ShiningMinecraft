@@ -7,11 +7,11 @@ public class Texture(long handle, uint textureId, uint textureIndex)
     private static readonly Dictionary<string, Texture> TexturesCache = new();
     private static readonly SortedDictionary<uint, Texture> TextureIndexToTexture = new();
     private static uint _textureIndex;
-    private static uint _ubo;
+    private static readonly uint Ubo;
 
     static Texture()
     {
-        GL.CreateBuffers(1, out _ubo);
+        GL.CreateBuffers(1, out Ubo);
     }
     public long Handle { get; } = handle;
     public uint TextureId { get; } = textureId;
@@ -37,10 +37,10 @@ public class Texture(long handle, uint textureId, uint textureIndex)
         };
         GL.CreateTextures(TextureTarget.Texture2D, 1, out uint textureId);
         GL.TextureStorage2D(textureId, mipMapCount, (SizedInternalFormat)blockSize.Item2, width, height);
-        GL.TextureParameter(textureId, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
+        GL.TextureParameter(textureId, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.NearestMipmapNearest);
         GL.TextureParameter(textureId, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-        GL.TextureParameter(textureId, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
-        GL.TextureParameter(textureId, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+        GL.TextureParameter(textureId, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+        GL.TextureParameter(textureId, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
         var w = width;
         var h = height;
         var size = (w + 3) / 4 * ((h + 3) / 4) * blockSize.Item1;
@@ -86,12 +86,12 @@ public class Texture(long handle, uint textureId, uint textureIndex)
     {
         var textureHandles = new long[TextureIndexToTexture.Count];
         foreach (var texture in TextureIndexToTexture.Values) textureHandles[texture.TextureIndex] = texture.Handle;
-        GL.NamedBufferStorage(_ubo, sizeof(long) * TextureIndexToTexture.Count, textureHandles, BufferStorageFlags.None);
-        GL.BindBufferBase(BufferRangeTarget.UniformBuffer, 3, _ubo);
+        GL.NamedBufferStorage(Ubo, sizeof(long) * TextureIndexToTexture.Count, textureHandles, BufferStorageFlags.None);
+        GL.BindBufferBase(BufferRangeTarget.UniformBuffer, 3, Ubo);
     }
     
     public static void Terminate()
     {
-        GL.DeleteBuffer(_ubo);
+        GL.DeleteBuffer(Ubo);
     }
 }

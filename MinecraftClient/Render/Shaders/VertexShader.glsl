@@ -1,5 +1,5 @@
 #version 460 core
-layout (location = 1) in uint BlockType16_Brightness6;
+layout (location = 0) in uint BlockType16_Brightness6;
 
 struct Fog
 {
@@ -10,13 +10,11 @@ struct Fog
 struct Block
 {
     vec4 positions[24];
-    uint indexTextures[6];
-    uint color[6];
-    uint specialEffects;
+    uvec4 indexTextures_Colors_SpecialEffects[6];
 };
 
 layout(binding = 1) uniform fogBlock { Fog fogs[2]; };
-layout(binding = 2, packed) restrict readonly buffer blocksBuffer { Block blocks[8]; };
+layout(binding = 2) restrict readonly buffer blocksBuffer { Block blocks[8]; };
 uniform mat4 transformationMatrix;
 uniform mat4 view;
 uniform mat4 projection;
@@ -36,9 +34,9 @@ void main()
     uint Face = gl_DrawID;
     Block block = blocks[BlockType];
     vec3 helper = vec3((indexInChunk / chunkHeight) / chunkDepth, (indexInChunk / chunkDepth) % chunkHeight, indexInChunk % chunkDepth);
-    uint brightness = (BrightnessBits >> (10 + Face)) & 0x1;
+    uint brightness = (BrightnessBits >> Face) & 0x1;
     vec3 pos = helper + block.positions[indexHelper + (Face * 4)].xyz;
-    if((block.specialEffects & 0x1) == 1)
+    if((block.indexTextures_Colors_SpecialEffects[Face].z & 0x1) == 1)
     {
         float speed = 2.0F;
         float pi = 3.14159265359F;
@@ -53,11 +51,11 @@ void main()
     }
     vec4 posRelativeToCamera = view * transformationMatrix * vec4(pos, 1.0);
 	gl_Position = projection * posRelativeToCamera;
-	outTexture = vec2(indexHelper % 2, (indexHelper / 2) % 2);
-	textureIndex = block.indexTextures[Face];
+	outTexture = vec2(indexHelper % 2 , (indexHelper / 2) % 2);
+	textureIndex = block.indexTextures_Colors_SpecialEffects[Face].x;
 	float distance = length(posRelativeToCamera.xyz);
 	vec4 fogColor = fogs[brightness].fogColor;
     float fogFactor = 1.0F - exp(-fogs[brightness].fogDensity * distance);
-    vec4 colorVector = vec4((block.color[Face] >> 24) / 255.0F, (block.color[Face] >> 16 & 0xFF) / 255.0F, (block.color[Face] >> 8 & 0xFF) / 255.0F, (block.color[Face] & 0xFF) / 255.0F); 
+    vec4 colorVector = vec4((block.indexTextures_Colors_SpecialEffects[Face].y >> 24) / 255.0F, (block.indexTextures_Colors_SpecialEffects[Face].y >> 16 & 0xFF) / 255.0F, (block.indexTextures_Colors_SpecialEffects[Face].y >> 8 & 0xFF) / 255.0F, (block.indexTextures_Colors_SpecialEffects[Face].y & 0xFF) / 255.0F);
     color =  mix(colorVector, fogColor, fogFactor);
 }

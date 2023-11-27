@@ -8,7 +8,7 @@ namespace MinecraftClient.Render.World.Block;
 
 public abstract class BlockRenderer(MinecraftLibrary.Engine.Blocks.Block block)
 {
-    private static readonly BlockRenderer[] BlockRenderers = { new AirBlockRenderer(), new AirBlockRenderer(), new AirBlockRenderer(), new AirBlockRenderer(), new StoneBlockRenderer() };
+    private static readonly BlockRenderer[] BlockRenderers = { new AirBlockRenderer(), new GrassBlockRenderer(), new DirtBlockRenderer(), new CobblestoneBlockRenderer(), new StoneBlockRenderer() };
     
     protected List<Texture> Textures { get; } = new();
     private readonly MinecraftLibrary.Engine.Blocks.Block _block = block;
@@ -20,7 +20,7 @@ public abstract class BlockRenderer(MinecraftLibrary.Engine.Blocks.Block block)
 
     static BlockRenderer()
     {
-        SsboData = new byte[(24 * 16 + 4 * 6 + 4 * 6 + 4) * BlockRenderers.Length];
+        SsboData = new byte[(24 * 16 + 6 * 16) * BlockRenderers.Length];
         var offset = 0;
         foreach (var blockRender in BlockRenderers)
         {
@@ -59,30 +59,17 @@ public abstract class BlockRenderer(MinecraftLibrary.Engine.Blocks.Block block)
             };
             Buffer.BlockCopy(vertices, 0, SsboData, offset, 24 * 16);
             offset += 24 * 16;
-            uint[] textureIndexes =
+            var textureIndexes = new uint[]
             {
-                blockRender.GetIndexTexture(BlockFaces.Top),
-                blockRender.GetIndexTexture(BlockFaces.Bottom),
-                blockRender.GetIndexTexture(BlockFaces.East),
-                blockRender.GetIndexTexture(BlockFaces.West),
-                blockRender.GetIndexTexture(BlockFaces.North),
-                blockRender.GetIndexTexture(BlockFaces.South),
+                blockRender.GetIndexTexture(BlockFaces.Top), blockRender.GetColor(BlockFaces.Top), blockRender.GetSpecialFactor(), 0,
+                blockRender.GetIndexTexture(BlockFaces.Bottom), blockRender.GetColor(BlockFaces.Bottom), blockRender.GetSpecialFactor(), 0,
+                blockRender.GetIndexTexture(BlockFaces.East), blockRender.GetColor(BlockFaces.East), blockRender.GetSpecialFactor(), 0,
+                blockRender.GetIndexTexture(BlockFaces.West), blockRender.GetColor(BlockFaces.West), blockRender.GetSpecialFactor(), 0,
+                blockRender.GetIndexTexture(BlockFaces.North), blockRender.GetColor(BlockFaces.North), blockRender.GetSpecialFactor(), 0,
+                blockRender.GetIndexTexture(BlockFaces.South), blockRender.GetColor(BlockFaces.South), blockRender.GetSpecialFactor(), 0,
             };
-            Buffer.BlockCopy(textureIndexes, 0, SsboData, offset, 6 * 4);
-            offset += 4 * 6;
-            var colors = new[]
-            {
-                blockRender.GetColor(BlockFaces.Top),
-                blockRender.GetColor(BlockFaces.Bottom),
-                blockRender.GetColor(BlockFaces.East),
-                blockRender.GetColor(BlockFaces.West),
-                blockRender.GetColor(BlockFaces.North),
-                blockRender.GetColor(BlockFaces.South),
-            };
-            Buffer.BlockCopy(colors, 0, SsboData, offset, 6 * 4);
-            offset += 4 * 6;
-            Buffer.BlockCopy(BitConverter.GetBytes(blockRender.GetSpecialFactor()), 0, SsboData, offset, 4);
-            offset += 4;
+            Buffer.BlockCopy(textureIndexes, 0, SsboData, offset, 16 * 6);
+            offset += 16 * 6;
         }
     }
 

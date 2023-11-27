@@ -419,7 +419,7 @@ public sealed class WorldState : State<WorldState>
     public void SetLight(Vector2i lightPos, byte newValue)
     {
         _lightUpdates.TryAdd(lightPos, _lights[lightPos]);
-        _lightUpdates[lightPos] = newValue;
+        _lights[lightPos] = newValue;
     }
 
     public EntityType GetEntityType(ushort entityId)

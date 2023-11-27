@@ -7,6 +7,6 @@ internal sealed class AirBlockRenderer() : BlockRenderer(MinecraftLibrary.Engine
 {
     protected override uint GetIndexTexture(BlockFaces face)
     {
-        return 0;
+        return uint.MaxValue;
     }
 }

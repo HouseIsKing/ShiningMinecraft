@@ -12,9 +12,9 @@ public class World
 {
     private static World? _instance;
     
-    private const int WorldWidth = 16;
-    private const int WorldHeight = 16;
-    private const int WorldDepth = 16;
+    private const int WorldWidth = 256;
+    private const int WorldHeight = 64;
+    private const int WorldDepth = 256;
     private readonly SortedList<ushort, Player> _players = new();
     private readonly SortedList<ushort, BlockParticleEntity> _blockParticles = new();
     private readonly List<PlayerState> _playersToSpawn = new();
@@ -324,31 +324,25 @@ public class World
     private void RecalculateLight(Vector3i blockPlaced, BlockType type)
     {
         var currentLight = State.GetLight(blockPlaced.Xz);
-        if (blockPlaced.Y < currentLight) return;
-        
-        if (Block.GetBlock(type).IsBlockingLight())
+        if (blockPlaced.Y < currentLight || blockPlaced.Y == 0) return;
+        Block block = Block.GetBlock(type);
+        if (blockPlaced.Y > currentLight)
         {
-            State.SetLight(blockPlaced.Xz, (byte)blockPlaced.Y);
+            if (block.IsBlockingLight())
+                State.SetLight(blockPlaced.Xz, (byte)blockPlaced.Y);
+            return;
         }
-        else
-        {
-            for (currentLight -= 1; currentLight > 0; currentLight--)
-                if (GetBlockAt(new Vector3i(blockPlaced.X, currentLight, blockPlaced.Z))
-                    .IsBlockingLight())
-                {
-                    State.SetLight(blockPlaced.Xz, currentLight);
-                    return;
-                }
+        for (currentLight -= 1; currentLight > 0; currentLight--)
+            if (GetBlockAt(new Vector3i(blockPlaced.X, currentLight, blockPlaced.Z)).IsBlockingLight())
+                break;
 
-            State.SetLight(blockPlaced.Xz, 0);
-        }
+        State.SetLight(blockPlaced.Xz, currentLight);
     }
 
     public byte GetBrightnessAt(Vector3i pos)
     {
         if (IsOutOfBounds(pos)) return 0;
-
-        return (byte)(State.GetLight(pos.Xz) > pos.Y ? 1 : 0);
+        return (byte)(State.GetLight(pos.Xz) < pos.Y ? 1 : 0);
     }
 
     public Random GetWorldRandom()
