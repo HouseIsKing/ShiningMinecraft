@@ -37,7 +37,7 @@ public class Texture(long handle, uint textureId, uint textureIndex)
         };
         GL.CreateTextures(TextureTarget.Texture2D, 1, out uint textureId);
         GL.TextureStorage2D(textureId, mipMapCount, (SizedInternalFormat)blockSize.Item2, width, height);
-        GL.TextureParameter(textureId, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.NearestMipmapNearest);
+        GL.TextureParameter(textureId, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
         GL.TextureParameter(textureId, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
         GL.TextureParameter(textureId, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
         GL.TextureParameter(textureId, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);

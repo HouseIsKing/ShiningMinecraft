@@ -332,10 +332,10 @@ public class World
                 State.SetLight(blockPlaced.Xz, (byte)blockPlaced.Y);
             return;
         }
+        if (block.IsBlockingLight()) return;
         for (currentLight -= 1; currentLight > 0; currentLight--)
             if (GetBlockAt(new Vector3i(blockPlaced.X, currentLight, blockPlaced.Z)).IsBlockingLight())
                 break;
-
         State.SetLight(blockPlaced.Xz, currentLight);
     }
 
@@ -363,5 +363,11 @@ public class World
     public Player GetPlayer(ushort id)
     {
         return _players[id];
+    }
+    
+    public ushort GetMaxChunksCount()
+    {
+        return WorldWidth / EngineDefaults.ChunkWidth * WorldHeight / EngineDefaults.ChunkHeight *
+            WorldDepth / EngineDefaults.ChunkDepth;
     }
 }

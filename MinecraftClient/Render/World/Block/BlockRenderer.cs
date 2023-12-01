@@ -20,45 +20,18 @@ public abstract class BlockRenderer(MinecraftLibrary.Engine.Blocks.Block block)
 
     static BlockRenderer()
     {
-        SsboData = new byte[(24 * 16 + 6 * 16) * BlockRenderers.Length];
+        SsboData = new byte[(2 * 16 + 6 * 16) * BlockRenderers.Length];
         var offset = 0;
         foreach (var blockRender in BlockRenderers)
         {
             var box = blockRender._block.BlockBounds;
             var vertices = new[]
             {
-                box.Min.X, box.Max.Y, box.Min.Z, 1.0f,
-                box.Max.X, box.Max.Y, box.Min.Z, 1.0f,
-                box.Min.X, box.Max.Y, box.Max.Z, 1.0f,
-                box.Max.X, box.Max.Y, box.Max.Z, 1.0f,
-                
                 box.Min.X, box.Min.Y, box.Min.Z, 1.0f,
-                box.Max.X, box.Min.Y, box.Min.Z, 1.0f,
-                box.Min.X, box.Min.Y, box.Max.Z, 1.0f,
-                box.Max.X, box.Min.Y, box.Max.Z, 1.0f,
-                
-                box.Max.X, box.Min.Y, box.Min.Z, 1.0f,
-                box.Max.X, box.Min.Y, box.Max.Z, 1.0f,
-                box.Max.X, box.Max.Y, box.Min.Z, 1.0f,
-                box.Max.X, box.Max.Y, box.Max.Z, 1.0f,
-                
-                box.Min.X, box.Min.Y, box.Min.Z, 1.0f,
-                box.Min.X, box.Min.Y, box.Max.Z, 1.0f,
-                box.Min.X, box.Max.Y, box.Min.Z, 1.0f,
-                box.Min.X, box.Max.Y, box.Max.Z, 1.0f,
-                
-                box.Min.X, box.Min.Y, box.Max.Z, 1.0f,
-                box.Max.X, box.Min.Y, box.Max.Z, 1.0f,
-                box.Min.X, box.Max.Y, box.Max.Z, 1.0f,
-                box.Max.X, box.Max.Y, box.Max.Z, 1.0f,
-                
-                box.Min.X, box.Min.Y, box.Min.Z, 1.0f,
-                box.Max.X, box.Min.Y, box.Min.Z, 1.0f,
-                box.Min.X, box.Max.Y, box.Min.Z, 1.0f,
-                box.Max.X, box.Max.Y, box.Min.Z, 1.0f
+                box.Max.X, box.Max.Y, box.Max.Z, 1.0f
             };
-            Buffer.BlockCopy(vertices, 0, SsboData, offset, 24 * 16);
-            offset += 24 * 16;
+            Buffer.BlockCopy(vertices, 0, SsboData, offset, 2 * 16);
+            offset += 2 * 16;
             var textureIndexes = new uint[]
             {
                 blockRender.GetIndexTexture(BlockFaces.Top), blockRender.GetColor(BlockFaces.Top), blockRender.GetSpecialFactor(), 0,

@@ -8,7 +8,7 @@ public class Shader
     private Dictionary<string, int> Uniforms = new();
     public int Program { get; }
     
-    public static Shader MainShader { get; } = new("Render/Shaders/VertexShader.glsl", "Render/Shaders/FragmentShader.glsl");
+    public static Shader MainShader { get; } = new("Render/Shaders/VertexShader.glsl", "Render/Shaders/FragmentShader.glsl", "Render/Shaders/GeometryShader.glsl");
 
     private static void CompileShader(int shader)
     {
@@ -33,7 +33,7 @@ public class Shader
         GL.DeleteProgram(Program);
     }
 
-    public Shader(string vertexPath, string fragmentPath)
+    private Shader(string vertexPath, string fragmentPath)
     {
         var vertexCode = File.ReadAllText(vertexPath);
         var fragmentCode = File.ReadAllText(fragmentPath);
@@ -51,6 +51,39 @@ public class Shader
         GL.DetachShader(Program, fragShader);
         GL.DeleteShader(vertShader);
         GL.DeleteShader(fragShader);
+        GL.GetProgram(Program, GetProgramParameterName.ActiveUniforms, out var uniformCount);
+        for (var i = 0; i < uniformCount; i++)
+        {
+            var name = GL.GetActiveUniform(Program, i, out _, out _);
+            Uniforms.Add(name, GL.GetUniformLocation(Program, name));
+        }
+    }
+
+    private Shader(string vertexPath, string fragmentPath, string geometryPath)
+    {
+        var vertexCode = File.ReadAllText(vertexPath);
+        var fragmentCode = File.ReadAllText(fragmentPath);
+        var geometryCode = File.ReadAllText(geometryPath);
+        var vertShader = GL.CreateShader(ShaderType.VertexShader);
+        GL.ShaderSource(vertShader, vertexCode);
+        CompileShader(vertShader);
+        var fragShader = GL.CreateShader(ShaderType.FragmentShader);
+        GL.ShaderSource(fragShader, fragmentCode);
+        CompileShader(fragShader);
+        var geomShader = GL.CreateShader(ShaderType.GeometryShader);
+        GL.ShaderSource(geomShader, geometryCode);
+        CompileShader(geomShader);
+        Program = GL.CreateProgram();
+        GL.AttachShader(Program, vertShader);
+        GL.AttachShader(Program, fragShader);
+        GL.AttachShader(Program, geomShader);
+        LinkProgram(Program);
+        GL.DetachShader(Program, vertShader);
+        GL.DetachShader(Program, fragShader);
+        GL.DetachShader(Program, geomShader);
+        GL.DeleteShader(vertShader);
+        GL.DeleteShader(fragShader);
+        GL.DeleteShader(geomShader);
         GL.GetProgram(Program, GetProgramParameterName.ActiveUniforms, out var uniformCount);
         for (var i = 0; i < uniformCount; i++)
         {

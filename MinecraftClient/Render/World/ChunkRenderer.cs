@@ -1,3 +1,4 @@
+using MinecraftClient.Render.Entities.Player;
 using MinecraftLibrary.Engine;
 using MinecraftLibrary.Engine.Blocks;
 using MinecraftLibrary.Engine.States.World;
@@ -6,17 +7,24 @@ using OpenTK.Mathematics;
 
 namespace MinecraftClient.Render.World;
 
-public class ChunkRenderer
+public sealed class ChunkRenderer
 {
-    private readonly ChunkTessellator _tessellator = new();
+    public ushort ChunkId { get; }
     private readonly ChunkState _state;
-    private HashSet<ushort> _dirtyVertexes = new();
-    private readonly List<uint>[] _triangles = { new(), new(), new(), new(), new(), new() };
+    private readonly HashSet<ushort> _dirtyVertexes = new();
+    private readonly List<uint>[] _triangles = { new(), new(), new() };
+
+    private Vector3 Position { get; }
+    private static Vector3 Rotation => Vector3.Zero;
+    private static Vector3 Scale => Vector3.One;
+
+    public Matrix4 ModelMatrix => Matrix4.CreateScale(Scale) * Matrix4.CreateRotationX(Rotation.X) * Matrix4.CreateRotationY(Rotation.Y) * Matrix4.CreateRotationZ(Rotation.Z) * Matrix4.CreateTranslation(Position);
     
-    public ChunkRenderer(ChunkState state)
+    public ChunkRenderer(ChunkState state, ushort id)
     {
+        ChunkId = id;
         _state = state;
-        _tessellator.Position = state.ChunkPosition;
+        Position = _state.ChunkPosition;
         _dirtyVertexes.EnsureCapacity(65536);
         for (ushort i = 0; i < EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth; i++) _dirtyVertexes.Add(i);
     }
@@ -48,26 +56,23 @@ public class ChunkRenderer
         }
     }
 
-    private void BuildTriangles()
+    private void BuildTriangles(ChunkTessellator tessellator)
     {
         _triangles[0].Clear();
         _triangles[1].Clear();
         _triangles[2].Clear();
-        _triangles[3].Clear();
-        _triangles[4].Clear();
-        _triangles[5].Clear();
         for (ushort i = 0; i < EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth; i++)
             if (_state.GetBlockAt(i) != BlockType.Air)
-                for (var j = 0; j < 6; j++)
-                    if (ShouldDrawCubeFace(i, (BlockFaces)j))
+                for (var j = 0; j < 3; j++)
+                    if (ShouldDrawCubeFace(i, (BlockFaces)(j * 2)) || ShouldDrawCubeFace(i, (BlockFaces)(j * 2 + 1)))
                         _triangles[j].Add(i);
-        _tessellator.SetTriangles(_triangles[0].ToArray(), _triangles[1].ToArray(), _triangles[2].ToArray(), _triangles[3].ToArray(), _triangles[4].ToArray(), _triangles[5].ToArray());
+        tessellator.SetTriangles(ChunkId, _triangles[0].ToArray(), _triangles[1].ToArray(), _triangles[2].ToArray());
     }
 
     private bool ShouldDrawCubeFace(ushort index, BlockFaces face)
     {
-        var world = MinecraftLibrary.Engine.World.GetInstance()!;
         var pos = EngineDefaults.GetVectorFromIndex(index) + _state.ChunkPosition;
+        var world = MinecraftLibrary.Engine.World.GetInstance()!;
         return face switch
         {
             BlockFaces.Bottom => !world.GetBlockAt(pos - Vector3i.UnitY).IsSolid(),
@@ -76,26 +81,19 @@ public class ChunkRenderer
             BlockFaces.East => !world.GetBlockAt(pos + Vector3i.UnitX).IsSolid(),
             BlockFaces.North => !world.GetBlockAt(pos + Vector3i.UnitZ).IsSolid(),
             BlockFaces.South => !world.GetBlockAt(pos - Vector3i.UnitZ).IsSolid(),
-            _ => throw new ArgumentOutOfRangeException(nameof(face), face, null)
+            _ => false
         };
     }
 
-    public void UpdateRenderer()
+    public void UpdateRenderer(ChunkTessellator tessellator)
     {
-        _tessellator.BeginUpdateVertex();
-        foreach (var vertex in _dirtyVertexes) _tessellator.SetVertex(vertex, _state.GetBlockAt(vertex), BuildLightByte(vertex));
-        _tessellator.EndUpdateVertex();
-        BuildTriangles();
+        foreach (var vertex in _dirtyVertexes) tessellator.SetVertex(ChunkId, vertex, _state.GetBlockAt(vertex), BuildLightByte(vertex));
+        BuildTriangles(tessellator);
         _dirtyVertexes.Clear();
     }
 
     public override int GetHashCode()
     {
-        return _tessellator.Position.GetHashCode();
-    }
-
-    public void Render()
-    {
-        _tessellator.Draw();
+        return _state.ChunkPosition.GetHashCode();
     }
 }

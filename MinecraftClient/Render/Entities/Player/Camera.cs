@@ -75,11 +75,7 @@ public class Camera
 
     public Matrix4 GetProjectionMatrix()
     {
-        if (IsDirtyProjectionMatrix)
-        {
-            RecalculateProjectionMatrix();
-        }
-
+        if (IsDirtyProjectionMatrix) RecalculateProjectionMatrix();
         return ProjectionMatrix;
     }
 

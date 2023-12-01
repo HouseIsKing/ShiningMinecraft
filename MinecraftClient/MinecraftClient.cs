@@ -66,10 +66,10 @@ public abstract class MinecraftClient : GameWindow
         WorldRenderer.Render();
         Camera.GetInstance().Yaw += MouseState.Delta.X;
         Camera.GetInstance().Pitch -= MouseState.Delta.Y;
-        Camera.GetInstance().Position += Camera.GetInstance().GetFrontVector() * Convert.ToSingle(KeyboardState.IsKeyDown(Keys.W)) * 0.1f;
+        Camera.GetInstance().Position += Camera.GetInstance().GetFrontVector() * Convert.ToSingle(KeyboardState.IsKeyDown(Keys.W)) * 0.005f;
         //Console.WriteLine($"Yaw: {Camera.GetInstance().Yaw} Pitch: {Camera.GetInstance().Pitch}");
         SwapBuffers();
-        //Console.WriteLine("Rendered");
+        GL.Finish();
         var timeTook = (float)Stopwatch.GetElapsedTime(start).TotalSeconds;
         Console.WriteLine($"Render took {timeTook} seconds");
     }

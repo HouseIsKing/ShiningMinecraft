@@ -13,7 +13,9 @@ namespace MinecraftClient.Render.World;
 public sealed class WorldRenderer
 {
     private int FogsBuffer;
-    private HashSet<ChunkRenderer> _chunkRenderers = new();
+    private readonly HashSet<ChunkRenderer> _chunkRenderers = new();
+    private readonly ChunkTessellator _chunkTessellator;
+    private readonly HashSet<ushort> _freeChunkIds = new();
     
     private void InitFog()
     {
@@ -29,11 +31,15 @@ public sealed class WorldRenderer
     }
     public WorldRenderer()
     {
-        MinecraftLibrary.Engine.World.GetInstance()!.OnChunkAdded += OnChunkAdded;
+        var world = MinecraftLibrary.Engine.World.GetInstance()!;
+        _chunkTessellator = new ChunkTessellator(world.GetMaxChunksCount());
+        world.OnChunkAdded += OnChunkAdded;
         Shader.MainShader.Use();
         //Shader.MainShader.SetUnsignedInt("worldTime", (uint)MinecraftLibrary.Engine.World.GetInstance()!.GetWorldTime());
+        Shader.MainShader.SetUnsignedInt("chunkWidth", EngineDefaults.ChunkWidth);
         Shader.MainShader.SetUnsignedInt("chunkHeight", EngineDefaults.ChunkHeight);
         Shader.MainShader.SetUnsignedInt("chunkDepth", EngineDefaults.ChunkDepth);
+        for (ushort i = 0; i < world.GetMaxChunksCount(); i++) _freeChunkIds.Add(i);
         InitFog();
         BlockRenderer.Setup();
         Texture.SetupTextures();
@@ -48,7 +54,9 @@ public sealed class WorldRenderer
 
     private void OnChunkAdded(ChunkState state)
     {
-        var renderer = new ChunkRenderer(state);
+        var renderer = new ChunkRenderer(state, _freeChunkIds.First());
+        _chunkTessellator.SetChunkTransform(renderer.ChunkId, renderer.ModelMatrix);
+        _freeChunkIds.Remove(renderer.ChunkId);
         _chunkRenderers.Add(renderer);
     }
 
@@ -66,7 +74,7 @@ public sealed class WorldRenderer
         Shader.MainShader.SetMat4("projection", camera.GetProjectionMatrix());
         var dirtyChunks = _chunkRenderers.Where(static renderer => renderer.IsDirty());
         using var dirtyChunksEnumerator = dirtyChunks.GetEnumerator();
-        for (var i = 0; i < 8 && dirtyChunksEnumerator.MoveNext(); i++) dirtyChunksEnumerator.Current.UpdateRenderer();
-        foreach (var renderer in _chunkRenderers) renderer.Render();
+        for (var i = 0; i < 8 && dirtyChunksEnumerator.MoveNext(); i++) dirtyChunksEnumerator.Current.UpdateRenderer(_chunkTessellator);
+        _chunkTessellator.Draw();
     }
 }

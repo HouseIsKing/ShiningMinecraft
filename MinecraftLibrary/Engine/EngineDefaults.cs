@@ -18,7 +18,7 @@ public static class EngineDefaults
     public const int PacketHistorySize = 20;
     public static readonly Vector3 PlayerSize = new(0.3f, 0.9f, 0.3f);
     public static readonly Vector3 ParticleSize = new(0.1f);
-    public static IEnumerable<byte> GetBytes(ClientInput data)
+    public static IEnumerable<byte> GetBytes<T>(T data) where T : struct
     {
         var size = Marshal.SizeOf(data);
         var arr = new byte[size];
