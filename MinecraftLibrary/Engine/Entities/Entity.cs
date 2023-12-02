@@ -43,6 +43,10 @@ public abstract class Entity<TEntityState> where TEntityState : EntityState<TEnt
             State.IsGrounded = State.Velocity.Y < 0;
             movementVector.Y = 0;
         }
+        else
+        {
+            State.IsGrounded = false;
+        }
 
         if (Math.Abs(movementVector.X - State.Velocity.X) > 0.0f) movementVector.X = 0;
         if (Math.Abs(movementVector.Z - State.Velocity.Z) > 0.0f) movementVector.Z = 0;

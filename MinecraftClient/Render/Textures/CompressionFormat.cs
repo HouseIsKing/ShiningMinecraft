@@ -1,7 +1,7 @@
 ﻿namespace MinecraftClient.Render.Textures;
 
-public enum CompressionFormat : uint
+internal enum CompressionFormat : uint
 {
-    DXT1 = 0x31545844,
-    DXT5 = 0x35545844
+    Dxt1 = 0x31545844,
+    Dxt5 = 0x35545844
 }

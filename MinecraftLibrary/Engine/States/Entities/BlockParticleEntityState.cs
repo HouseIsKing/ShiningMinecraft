@@ -92,7 +92,9 @@ public sealed class BlockParticleEntityState : EntityState<BlockParticleEntitySt
             {
                 changePacket.Write(i);
                 SerializeChangeToChangePacket(changePacket, i);
+                _changes[i].Item1 = false;
             }
+        _changesCount = 0;
     }
 
     private void SerializeChangeToChangePacket(Packet changePacket, byte change)
@@ -120,7 +122,9 @@ public sealed class BlockParticleEntityState : EntityState<BlockParticleEntitySt
             {
                 revertPacket.Write(i);
                 SerializeChangeToRevertPacket(revertPacket, i);
+                _changes[i].Item1 = false;
             }
+        _changesCount = 0;
     }
 
     private void SerializeChangeToRevertPacket(Packet revertPacket, byte change)
@@ -165,12 +169,5 @@ public sealed class BlockParticleEntityState : EntityState<BlockParticleEntitySt
                 packet.Read(out _maxLifeTime);
                 break;
         }
-    }
-
-    public override void FinalizeChanges()
-    {
-        base.FinalizeChanges();
-        _changesCount = 0;
-        for (var i = 0; i < _changes.Length; i++) _changes[i].Item1 = false;
     }
 }

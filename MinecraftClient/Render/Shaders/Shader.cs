@@ -9,6 +9,7 @@ public class Shader
     public int Program { get; }
     
     public static Shader MainShader { get; } = new("Render/Shaders/VertexShader.glsl", "Render/Shaders/FragmentShader.glsl", "Render/Shaders/GeometryShader.glsl");
+    //public static Shader SelectionHighlightAShader { get; } = new("Render/Shaders/SelectionHighlightVShader.glsl", "Render/Shaders/SelectionHighlightFShader.glsl", "Render/Shaders/SelectionHighlightGShader.glsl");
 
     private static void CompileShader(int shader)
     {

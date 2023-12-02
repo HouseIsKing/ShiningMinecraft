@@ -7,12 +7,16 @@ namespace MinecraftLibrary.Engine.States.World;
 
 public sealed class WorldState : State<WorldState>
 {
-    private readonly Dictionary<Vector3i, ChunkState> _chunks = new();
-    private readonly Dictionary<Vector2i, byte> _lights = new();
+    private Vector3i _baseVector;
+    private readonly ChunkState[,,] _chunks;
+    private ushort _dirtyChunksCount;
+    private readonly LightChunkState[,] _lights;
+    private ushort _dirtyLightsCount;
     private readonly Dictionary<ushort, PlayerState> _players = new();
+    private ushort _dirtyPlayersCount;
     private readonly Dictionary<ushort, BlockParticleEntityState> _blockParticles = new();
+    private ushort _dirtyBlockParticlesCount;
     private readonly Dictionary<ushort, EntityType> _entityIdToType = new();
-    private readonly Dictionary<Vector2i, byte> _lightUpdates = new();
     private readonly HashSet<ushort> _newEntities = new();
     private readonly Dictionary<ushort, KeyValuePair<EntityType, object>> _removedEntities = new();
     internal Random Random { get; }
@@ -21,40 +25,40 @@ public sealed class WorldState : State<WorldState>
 
     public long Seed { get; }
 
-    public WorldState(long seed)
+    public WorldState(long seed, ushort maxX, ushort maxY, ushort maxZ)
     {
+        _chunks = new ChunkState[maxX / EngineDefaults.ChunkWidth, maxY / EngineDefaults.ChunkHeight, maxZ / EngineDefaults.ChunkDepth];
+        _lights = new LightChunkState[maxX, maxZ];
         Seed = seed;
         Random = new Random(seed);
         _entityIdToType.EnsureCapacity(ushort.MaxValue);
-        for (var i = ushort.MaxValue; i > 0; i++)
-            _entityIdToType.Add(i, EntityType.Null);
+        for (var i = ushort.MaxValue; i > 0; i--) _entityIdToType.Add(i, EntityType.Null);
         _entityIdToType.Add(0, EntityType.Null);
     }
 
-    public WorldState()
+    public WorldState(ushort maxX, ushort maxY, ushort maxZ)
     {
+        _chunks = new ChunkState[maxX / EngineDefaults.ChunkWidth, maxY / EngineDefaults.ChunkHeight, maxZ / EngineDefaults.ChunkDepth];
+        _lights = new LightChunkState[maxX, maxZ];
         Seed = -1;
         Random = new Random();
         _entityIdToType.EnsureCapacity(ushort.MaxValue);
-        for (var i = ushort.MaxValue; i > 0; i++)
-            _entityIdToType.Add(i, EntityType.Null);
+        for (var i = ushort.MaxValue; i > 0; i--) _entityIdToType.Add(i, EntityType.Null);
         _entityIdToType.Add(0, EntityType.Null);
     }
 
     private void SerializeChunks(Packet packet)
     {
-        packet.Write(_chunks.Count);
-        foreach (var chunk in _chunks.Values)
-            chunk.Serialize(packet);
+        packet.Write(_chunks.GetLength(0));
+        packet.Write(_chunks.GetLength(1));
+        packet.Write(_chunks.GetLength(2));
+        foreach (var chunk in _chunks) chunk.Serialize(packet);
     }
     private void SerializeLights(Packet packet)
     {
-        packet.Write(_lights.Count);
-        foreach (var light in _lights)
-        {
-            packet.Write(light.Key);
-            packet.Write(light.Value);
-        }
+        packet.Write(_lights.GetLength(0));
+        packet.Write(_lights.GetLength(1));
+        foreach (var light in _lights) light.Serialize(packet);
     }
     private void SerializePlayers(Packet packet)
     {
@@ -81,25 +85,32 @@ public sealed class WorldState : State<WorldState>
     }
     private void DeserializeChunks(Packet packet)
     {
-        packet.Read(out int chunkCount);
-        _chunks.EnsureCapacity(chunkCount);
-        for (var i = 0; i < chunkCount; i++)
+        packet.Read(out int i);
+        packet.Read(out int j);
+        packet.Read(out int k);
+        for (var a = 0; a < i; a++)
+        for (var b = 0; b < j; b++)
+        for (var c = 0; c < k; c++)
         {
             packet.Read(out Vector3i chunkPosition);
             var chunk = new ChunkState(chunkPosition);
+            chunk.OnChange += ChunkChanged;
             chunk.Deserialize(packet);
-            _chunks.Add(chunkPosition, chunk);
+            _chunks[a, b, c] = chunk;
         }
     }
     private void DeserializeLights(Packet packet)
     {
-        packet.Read(out int lightCount);
-        _lights.EnsureCapacity(lightCount);
-        for (var i = 0; i < lightCount; i++)
+        packet.Read(out int i);
+        packet.Read(out int j);
+        for (var a = 0; a < i; a++)
+        for (var b = 0; b < j; b++)
         {
             packet.Read(out Vector2i lightPosition);
-            packet.Read(out byte lightLevel);
-            _lights.Add(lightPosition, lightLevel);
+            var light = new LightChunkState(lightPosition);
+            light.OnChange += LightChanged;
+            light.Deserialize(packet);
+            _lights[a, b] = light;
         }
     }
     private void DeserializePlayers(Packet packet)
@@ -110,12 +121,14 @@ public sealed class WorldState : State<WorldState>
             packet.Read(out ushort playerId);
             _entityIdToType[playerId] = EntityType.Player;
             var player = new PlayerState(playerId);
+            player.OnChange += PlayerChanged;
             player.Deserialize(packet);
             RegisterPlayer(player);
         }
     }
     public override void SerializeChangesToChangePacket(Packet changePacket)
     {
+        base.SerializeChangesToChangePacket(changePacket);
         changePacket.Write(WorldTime);
         changePacket.Write(Random.GetSeed());
         SerializeChangesChunks(changePacket);
@@ -125,31 +138,44 @@ public sealed class WorldState : State<WorldState>
     }
     private void SerializeChangesChunks(Packet changePacket)
     {
-        changePacket.Write(_chunks.Values.Count(static state => state.IsDirty));
-        foreach (var state in _chunks.Values.Where(static state => state.IsDirty))
-        {
-            changePacket.Write(state.ChunkPosition);
-            state.SerializeChangesToChangePacket(changePacket);
-        }
+        changePacket.Write(_dirtyChunksCount);
+        for (byte i = 0; i < _chunks.GetLength(0); i++)
+        for (byte j = 0; j < _chunks.GetLength(1); j++)
+        for (byte k = 0; k < _chunks.GetLength(2); k++)
+            if (_chunks[i, j, k].IsDirty)
+            {
+                changePacket.Write(i);
+                changePacket.Write(j);
+                changePacket.Write(k);
+                _chunks[i, j, k].SerializeChangesToChangePacket(changePacket);
+            }
+
+        _dirtyChunksCount = 0;
     }
     private void SerializeChangesLights(Packet changePacket)
     {
-        changePacket.Write(_lightUpdates.Count);
-        foreach (var lightUpdate in _lightUpdates)
-        {
-            changePacket.Write(lightUpdate.Key);
-            changePacket.Write(_lights[lightUpdate.Key]);
-        }
+        changePacket.Write(_dirtyLightsCount);
+        for (ushort i = 0; i < _lights.GetLength(0); i++)
+        for (ushort j = 0; j < _lights.GetLength(1); j++)
+            if (_lights[i, j].IsDirty)
+            {
+                changePacket.Write(i);
+                changePacket.Write(j);
+                _lights[i, j].SerializeChangesToChangePacket(changePacket);
+            }
+
+        _dirtyLightsCount = 0;
     }
     private void SerializeChangesPlayers(Packet changePacket)
     {
-        var count = _players.Values.Count(static state => state.IsDirty);
-        changePacket.Write(count);
+        changePacket.Write(_dirtyPlayersCount);
         foreach (var entity in _players.Values.Where(static state => state.IsDirty))
         {
             changePacket.Write(entity.EntityId);
             entity.SerializeChangesToChangePacket(changePacket);
         }
+
+        _dirtyPlayersCount = 0;
     }
     private void SerializeChangesEntity(Packet changePacket)
     {
@@ -159,15 +185,18 @@ public sealed class WorldState : State<WorldState>
             changePacket.Write(newEntity);
             changePacket.Write((byte)_entityIdToType[newEntity]);
         }
+        _newEntities.Clear();
         changePacket.Write(_removedEntities.Count);
         foreach (var removedEntity in _removedEntities)
         {
             changePacket.Write(removedEntity.Key);
             changePacket.Write((byte)EntityType.Null);
         }
+        _removedEntities.Clear();
     }
     public override void SerializeChangesToRevertPacket(Packet revertPacket)
     {
+        base.SerializeChangesToRevertPacket(revertPacket);
         revertPacket.Write(WorldTime - 1);
         revertPacket.Write(_prevRandomSeed);
         SerializeRevertChunks(revertPacket);
@@ -177,31 +206,44 @@ public sealed class WorldState : State<WorldState>
     }
     private void SerializeRevertChunks(Packet revertPacket)
     {
-        revertPacket.Write(_chunks.Values.Count(static state => state.IsDirty));
-        foreach (var state in _chunks.Values.Where(static state => state.IsDirty))
-        {
-            revertPacket.Write(state.ChunkPosition);
-            state.SerializeChangesToRevertPacket(revertPacket);
-        }
+        revertPacket.Write(_dirtyChunksCount);
+        for (byte i = 0; i < _chunks.GetLength(0); i++)
+        for (byte j = 0; j < _chunks.GetLength(1); j++)
+        for (byte k = 0; k < _chunks.GetLength(2); k++)
+            if (_chunks[i, j, k].IsDirty)
+            {
+                revertPacket.Write(i);
+                revertPacket.Write(j);
+                revertPacket.Write(k);
+                _chunks[i, j, k].SerializeChangesToRevertPacket(revertPacket);
+            }
+
+        _dirtyChunksCount = 0;
     }
     private void SerializeRevertLights(Packet revertPacket)
     {
-        revertPacket.Write(_lightUpdates.Count);
-        foreach (var lightUpdate in _lightUpdates)
-        {
-            revertPacket.Write(lightUpdate.Key);
-            revertPacket.Write(_lights[lightUpdate.Key]);
-        }
+        revertPacket.Write(_dirtyLightsCount);
+        for (ushort i = 0; i < _lights.GetLength(0); i++)
+        for (ushort j = 0; j < _lights.GetLength(1); j++)
+            if (_lights[i, j].IsDirty)
+            {
+                revertPacket.Write(i);
+                revertPacket.Write(j);
+                _lights[i, j].SerializeChangesToRevertPacket(revertPacket);
+            }
+
+        _dirtyLightsCount = 0;
     }
     private void SerializeRevertPlayers(Packet revertPacket)
     {
-        var count = _players.Values.Count(static state => state.IsDirty);
-        revertPacket.Write(count);
+        revertPacket.Write(_dirtyPlayersCount);
         foreach (var entity in _players.Values.Where(static state => state.IsDirty))
         {
             revertPacket.Write(entity.EntityId);
             entity.SerializeChangesToRevertPacket(revertPacket);
         }
+
+        _dirtyPlayersCount = 0;
     }
     private void SerializeRevertEntity(Packet revertPacket)
     {
@@ -211,6 +253,7 @@ public sealed class WorldState : State<WorldState>
             revertPacket.Write(newEntity);
             revertPacket.Write((byte)EntityType.Null);
         }
+        _newEntities.Clear();
         revertPacket.Write(_removedEntities.Count);
         foreach (var removedEntity in _removedEntities)
         {
@@ -229,29 +272,32 @@ public sealed class WorldState : State<WorldState>
                     throw new ArgumentOutOfRangeException(nameof(removedEntity.Value.Key), removedEntity.Value.Key, "Invalid Entity Type");
             }
         }
+        _removedEntities.Clear();
     }
     private void DeserializeChangesChunks(Packet changePacket)
     {
-        changePacket.Read(out int chunkCount);
+        changePacket.Read(out ushort chunkCount);
         for (var i = 0; i < chunkCount; i++)
         {
-            changePacket.Read(out Vector3i chunkPosition);
-            _chunks[chunkPosition].DeserializeChanges(changePacket);
+            changePacket.Read(out byte a);
+            changePacket.Read(out byte b);
+            changePacket.Read(out byte c);
+            _chunks[a, b, c].DeserializeChanges(changePacket);
         }
     }
     private void DeserializeChangesLights(Packet changePacket)
     {
-        changePacket.Read(out int lightCount);
+        changePacket.Read(out ushort lightCount);
         for (var i = 0; i < lightCount; i++)
         {
-            changePacket.Read(out Vector2i lightPosition);
-            changePacket.Read(out byte lightLevel);
-            _lights[lightPosition] = lightLevel;
+            changePacket.Read(out ushort a);
+            changePacket.Read(out ushort b);
+            _lights[a, b].DeserializeChanges(changePacket);
         }
     }
     private void DeserializeChangesPlayers(Packet changePacket)
     {
-        changePacket.Read(out int playerCount);
+        changePacket.Read(out ushort playerCount);
         for (var i = 0; i < playerCount; i++)
         {
             changePacket.Read(out ushort playerId);
@@ -341,21 +387,12 @@ public sealed class WorldState : State<WorldState>
         DeserializeChangesEntityLeave(changePacket);
     }
 
-    public override void FinalizeChanges()
-    {
-        base.FinalizeChanges();
-        foreach (var chunk in _chunks.Values.Where(static chunk => chunk.IsDirty)) chunk.FinalizeChanges();
-        foreach (var player in _players.Values.Where(static player => player.IsDirty)) player.FinalizeChanges();
-        foreach (var blockParticle in _blockParticles.Values.Where(static particle => particle.IsDirty)) blockParticle.FinalizeChanges();
-        _lightUpdates.Clear();
-        _newEntities.Clear();
-        _removedEntities.Clear();
-    }
-
     public void AddChunk(Vector3i chunkPosition)
     {
         ChunkState chunk = new(chunkPosition);
-        _chunks.Add(chunkPosition, chunk);
+        chunk.OnChange += ChunkChanged;
+        var pos = chunkPosition - _baseVector;
+        _chunks[pos.X / EngineDefaults.ChunkWidth, pos.Y / EngineDefaults.ChunkHeight, pos.Z / EngineDefaults.ChunkDepth] = chunk;
     }
 
     public PlayerState AddPlayer()
@@ -388,11 +425,13 @@ public sealed class WorldState : State<WorldState>
 
     public void RegisterPlayer(PlayerState state)
     {
+        state.OnChange += PlayerChanged;
         _players.Add(state.EntityId, state);
     }
 
     public void RegisterBlockParticle(BlockParticleEntityState state)
     {
+        state.OnChange += BlockParticleChanged;
         _blockParticles.Add(state.EntityId, state);
     }
 
@@ -413,13 +452,15 @@ public sealed class WorldState : State<WorldState>
 
     public void AddLight(Vector2i lightPos)
     {
-        _lights.Add(lightPos, 0);
+        var pos = lightPos - _baseVector.Xz;
+        _lights[pos.X, pos.Y] = new LightChunkState(lightPos);
+        _lights[pos.X, pos.Y].OnChange += LightChanged;
     }
 
     public void SetLight(Vector2i lightPos, byte newValue)
     {
-        _lightUpdates.TryAdd(lightPos, _lights[lightPos]);
-        _lights[lightPos] = newValue;
+        var pos = lightPos - _baseVector.Xz;
+        _lights[pos.X, pos.Y].LightLevel = newValue;
     }
 
     public EntityType GetEntityType(ushort entityId)
@@ -429,14 +470,17 @@ public sealed class WorldState : State<WorldState>
 
     public ChunkState GetChunkAt(Vector3i chunkPosition)
     {
-        return _chunks[chunkPosition];
+        var pos = chunkPosition - _baseVector;
+        return _chunks[pos.X / EngineDefaults.ChunkWidth, pos.Y / EngineDefaults.ChunkHeight, pos.Z / EngineDefaults.ChunkDepth];
     }
 
     public void SaveWorld(GZipStream stream)
     {
-        stream.Write(BitConverter.GetBytes(_chunks.Count));
+        stream.Write(BitConverter.GetBytes(_chunks.GetLength(0)));
+        stream.Write(BitConverter.GetBytes(_chunks.GetLength(1)));
+        stream.Write(BitConverter.GetBytes(_chunks.GetLength(2)));
         var packet = new Packet(new PacketHeader(PacketType.SaveWorld));
-        foreach (var chunk in _chunks.Values) chunk.Serialize(packet);
+        foreach (var chunk in _chunks) chunk.Serialize(packet);
         stream.Write(packet.ReadAll());
     }
 
@@ -449,17 +493,50 @@ public sealed class WorldState : State<WorldState>
             packet.Write(b);
             b = stream.ReadByte();
         } while (b != -1);
-
-        packet.Read(out int chunkCount);
-        for (var i = 0; i < chunkCount; i++)
+        
+        packet.Read(out int i);
+        packet.Read(out int j);
+        packet.Read(out int k);
+        for (var a = 0; a < i; a++)
+        for (b = 0; b < j; b++)
+        for (var c = 0; c < k; c++)
         {
             packet.Read(out Vector3i chunkPosition);
-            _chunks[chunkPosition].Deserialize(packet);
+            var chunk = new ChunkState(chunkPosition);
+            chunk.OnChange += ChunkChanged;
+            chunk.Deserialize(packet);
+            _chunks[a, b, c] = chunk;
         }
     }
 
     public byte GetLight(Vector2i pos)
     {
-        return _lights[pos];
+        var finalPos = pos - _baseVector.Xz;
+        return _lights[finalPos.X, finalPos.Y].LightLevel;
+    }
+
+    private void ChunkChanged()
+    {
+        _dirtyChunksCount++;
+    }
+    
+    private void LightChanged()
+    {
+        _dirtyLightsCount++;
+    }
+    
+    private void PlayerChanged()
+    {
+        _dirtyPlayersCount++;
+    }
+    
+    private void BlockParticleChanged()
+    {
+        _dirtyBlockParticlesCount++;
+    }
+    
+    public Vector3i GetBaseVector()
+    {
+        return _baseVector;
     }
 }

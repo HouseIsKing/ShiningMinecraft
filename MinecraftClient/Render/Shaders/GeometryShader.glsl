@@ -1,16 +1,13 @@
 #version 460 core
 layout (points) in;
 layout (triangle_strip, max_vertices = 4) out;
-
-uniform mat4 view;
-uniform mat4 projection;
-uniform uint worldTime;
+layout(binding = 5) uniform CameraInfo { mat4 view; mat4 projection; };
+layout(binding = 6) uniform WorldInfo { uint chunkWidth; uint chunkHeight; uint chunkDepth; uint worldTime; };
 
 in vec3 boundsMin[];
 in vec3 boundsMax[];
 in flat uint textureIndex[];
 in uint Face[];
-in uint specialEffects[];
 in float fogDensity[];
 in vec4 color[];
 in vec4 fogColor[];
@@ -39,7 +36,7 @@ void main()
 {
     fragTextureIndex = textureIndex[0];
     vec4 pos = gl_in[0].gl_Position;
-    if (specialEffects[0] == 1u)
+    /*if (specialEffects[0] == 1u)
     {
         float speed = 2.0F;
         float pi = 3.14159265359F;
@@ -51,7 +48,7 @@ void main()
         pos.x += sin((worldTime * pi / (18.0F * speed)) + (-pos.x + d0) * 1.6F + (pos.z + d1) * 1.6F) * magnitude;
         pos.z += sin((worldTime * pi / (17.0F * speed)) + (pos.z + d2) * 1.6F + (-pos.x + d3) * 1.6F) * magnitude;
         pos.y += sin((worldTime * pi / (11.0F * speed)) + (pos.z + d2) + (pos.x + d3)) * (magnitude / 2.0F);
-    }
+    }*/
     if (Face[0] == 0u)
     {
         gl_Position = view * transformationMatrix[0] * (pos + vec4(boundsMin[0].x, boundsMax[0].y, boundsMin[0].z, 0.0F));

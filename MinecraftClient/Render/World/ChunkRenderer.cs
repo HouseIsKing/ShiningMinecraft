@@ -11,7 +11,9 @@ public sealed class ChunkRenderer
 {
     public ushort ChunkId { get; }
     private readonly ChunkState _state;
-    private readonly HashSet<ushort> _dirtyVertexes = new();
+
+    private readonly HashSet<ushort> _dirtyVertexes =
+        new(EngineDefaults.ChunkHeight * EngineDefaults.ChunkWidth * EngineDefaults.ChunkDepth);
     private readonly List<uint>[] _triangles = { new(), new(), new() };
 
     private Vector3 Position { get; }
@@ -25,7 +27,6 @@ public sealed class ChunkRenderer
         ChunkId = id;
         _state = state;
         Position = _state.ChunkPosition;
-        _dirtyVertexes.EnsureCapacity(65536);
         for (ushort i = 0; i < EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth; i++) _dirtyVertexes.Add(i);
     }
 
@@ -53,6 +54,7 @@ public sealed class ChunkRenderer
         {
             packet.Read(out ushort index);
             _dirtyVertexes.Add(index);
+            packet.Read(out byte _);
         }
     }
 

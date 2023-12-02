@@ -148,7 +148,8 @@ public sealed class Packet(PacketHeader header)
 
     public void Read(out byte item)
     {
-        item = _data[0];
+        item = _data[_dataPos];
+        _dataPos++;
     }
 
     public void Read(out ClientInput data)

@@ -25,11 +25,11 @@ public sealed class Player : LivingEntity<PlayerState>
         if (_inputQueue.TryDequeue(out var helper))
         {
             LastInputProcessed = helper.Key;
-            State.PlayerInput.ApplyClientInput(helper.Value);
+            State.ApplyClientInput(helper.Value);
         }
         else
         {
-            State.PlayerInput.ApplyClientInput(new ClientInput());
+            State.ApplyClientInput(new ClientInput());
         }
 
         ProcessCurrentPlayerInput();
@@ -43,9 +43,8 @@ public sealed class Player : LivingEntity<PlayerState>
     private void FindClosestFace()
     {
         _foundBlock = false;
-        var forwardVector = EngineDefaults.GetFrontVector(State.Rotation.Y, State.Rotation.X);
-        var position = new Vector3(State.Position.X,
-            State.Position.Y + EngineDefaults.CameraOffset - EngineDefaults.PlayerSize.Y, State.Position.Z);
+        var forwardVector = EngineDefaults.GetFrontVector(State.Rotation.Y, State.Pitch);
+        var position = new Vector3(State.Position.X, State.Position.Y + EngineDefaults.CameraOffset - EngineDefaults.PlayerSize.Y, State.Position.Z);
         var right = forwardVector.X > 0.0F;
         var up = forwardVector.Y > 0.0F;
         var forward = forwardVector.Z > 0.0F;
@@ -53,20 +52,18 @@ public sealed class Player : LivingEntity<PlayerState>
         const float maxDistance = 4.0F;
         while (totalDistance <= maxDistance)
         {
-            var xDistanceToComplete = forwardVector.X;
-            if (right)
-                xDistanceToComplete = EngineDefaults.GetNextWholeNumberDistance(position.X) / xDistanceToComplete;
+            var xDistanceToComplete = float.Abs(forwardVector.X);
+            if (right) xDistanceToComplete = EngineDefaults.GetNextWholeNumberDistance(position.X) / xDistanceToComplete;
             else xDistanceToComplete = EngineDefaults.GetPrevWholeNumberDistance(position.X) / xDistanceToComplete;
-            var yDistanceToComplete = forwardVector.Y;
+            var yDistanceToComplete = float.Abs(forwardVector.Y);
             if (up) yDistanceToComplete = EngineDefaults.GetNextWholeNumberDistance(position.Y) / yDistanceToComplete;
             else yDistanceToComplete = EngineDefaults.GetPrevWholeNumberDistance(position.Y) / yDistanceToComplete;
-            var zDistanceToComplete = forwardVector.Z;
-            if (forward)
-                zDistanceToComplete = EngineDefaults.GetNextWholeNumberDistance(position.Z) / zDistanceToComplete;
+            var zDistanceToComplete = float.Abs(forwardVector.Z);
+            if (forward) zDistanceToComplete = EngineDefaults.GetNextWholeNumberDistance(position.Z) / zDistanceToComplete;
             else zDistanceToComplete = EngineDefaults.GetPrevWholeNumberDistance(position.Z) / zDistanceToComplete;
             if (xDistanceToComplete < yDistanceToComplete && xDistanceToComplete < zDistanceToComplete)
             {
-                totalDistance += xDistanceToComplete;
+                totalDistance += float.Abs(xDistanceToComplete);
                 if (totalDistance > maxDistance) return;
 
                 position += xDistanceToComplete * forwardVector;
@@ -77,11 +74,12 @@ public sealed class Player : LivingEntity<PlayerState>
 
                 _foundBlock = true;
                 _hitFace = right ? BlockFaces.West : BlockFaces.East;
+                break;
             }
 
             if (yDistanceToComplete < zDistanceToComplete)
             {
-                totalDistance += yDistanceToComplete;
+                totalDistance += float.Abs(yDistanceToComplete);
                 if (totalDistance > maxDistance) return;
 
                 position += yDistanceToComplete * forwardVector;
@@ -92,9 +90,10 @@ public sealed class Player : LivingEntity<PlayerState>
 
                 _foundBlock = true;
                 _hitFace = up ? BlockFaces.Bottom : BlockFaces.Top;
+                break;
             }
 
-            totalDistance += zDistanceToComplete;
+            totalDistance += float.Abs(zDistanceToComplete);
             if (totalDistance > maxDistance) return;
 
             position += zDistanceToComplete * forwardVector;
@@ -105,6 +104,7 @@ public sealed class Player : LivingEntity<PlayerState>
 
             _foundBlock = true;
             _hitFace = forward ? BlockFaces.South : BlockFaces.North;
+            break;
         }
     }
 
@@ -142,7 +142,7 @@ public sealed class Player : LivingEntity<PlayerState>
     private void ProcessCurrentPlayerInput()
     {
         var input = State.PlayerInput;
-        State.JumpInput = input.IsKeyHold(KeySet.Jump);
+        State.JumpInput = input.IsKeyPressed(KeySet.Jump);
         State.Pitch = Math.Clamp(State.Pitch + input.GetMouseY(), -89.0f, 89.0f);
         State.Rotation = State.Rotation with { Y = State.Rotation.Y + input.GetMouseX() };
         if (input.IsKeyHold(KeySet.Up)) State.VerticalInput = 1;

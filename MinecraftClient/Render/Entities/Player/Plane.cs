@@ -2,5 +2,10 @@
 
 public enum Plane
 {
-    PlaneBack, PlaneFront, PlaneLeft, PlaneRight, PlaneTop, PlaneBottom
+    PlaneBack,
+    PlaneFront,
+    PlaneLeft,
+    PlaneRight,
+    PlaneTop,
+    PlaneBottom
 }

@@ -12,9 +12,9 @@ public class World
 {
     private static World? _instance;
     
-    private const int WorldWidth = 256;
-    private const int WorldHeight = 64;
-    private const int WorldDepth = 256;
+    public const int WorldWidth = 256;
+    public const int WorldHeight = 64;
+    public const int WorldDepth = 256;
     private readonly SortedList<ushort, Player> _players = new();
     private readonly SortedList<ushort, BlockParticleEntity> _blockParticles = new();
     private readonly List<PlayerState> _playersToSpawn = new();
@@ -36,7 +36,7 @@ public class World
     {
         if (_instance != null) throw new Exception("World already exists");
 
-        State = new WorldState(seed);
+        State = new WorldState(seed, WorldWidth, WorldHeight, WorldDepth);
         _instance = this;
     }
 
@@ -44,7 +44,7 @@ public class World
     {
         if (_instance != null) throw new Exception("World already exists");
 
-        State = new WorldState();
+        State = new WorldState(WorldWidth, WorldHeight, WorldDepth);
         _instance = this;
     }
 
@@ -53,7 +53,7 @@ public class World
         _instance = null;
     }
 
-    protected void PreTick()
+    private void PreTick()
     {
         foreach (var state in _playersToSpawn)
         {
@@ -103,11 +103,10 @@ public class World
             State.SerializeChangesToRevertPacket(packet);
         else
             State.SerializeChangesToChangePacket(packet);
-        State.FinalizeChanges();
         packet.WriteDataLength();
     }
 
-    protected void PostTick()
+    private void PostTick()
     {
         foreach (var id in _playersToDespawn)
         {
@@ -143,15 +142,7 @@ public class World
 
     public ChunkState GetChunkAt(Vector3i pos)
     {
-        var chunkPos = new Vector3i(pos.X / EngineDefaults.ChunkWidth, pos.Y / EngineDefaults.ChunkHeight,
-            pos.Z / EngineDefaults.ChunkDepth);
-        if (pos.X < 0) chunkPos.X -= EngineDefaults.ChunkWidth;
-        if (pos.Y < 0) chunkPos.Y -= EngineDefaults.ChunkHeight;
-        if (pos.Z < 0) chunkPos.Z -= EngineDefaults.ChunkDepth;
-        chunkPos.X *= EngineDefaults.ChunkWidth;
-        chunkPos.Y *= EngineDefaults.ChunkHeight;
-        chunkPos.Z *= EngineDefaults.ChunkDepth;
-        return State.GetChunkAt(chunkPos);
+        return State.GetChunkAt(pos);
     }
 
     public PlayerState SpawnPlayer()
@@ -220,7 +211,7 @@ public class World
     public void SetBlockAt(Vector3i pos, BlockType block)
     {
         if (IsOutOfBounds(pos)) return;
-        ChunkState chunk = GetChunkAt(pos);
+        var chunk = GetChunkAt(pos);
         var indexVector = pos - chunk.ChunkPosition;
         chunk.SetBlockAt(EngineDefaults.GetIndexFromVector(indexVector), block);
         RecalculateLight(pos, block);
@@ -242,7 +233,8 @@ public class World
                 var pos = new Vector3i(x * EngineDefaults.ChunkWidth, y * EngineDefaults.ChunkHeight,
                     z * EngineDefaults.ChunkDepth);
                 State.AddChunk(pos);
-                OnChunkAdded?.Invoke(State.GetChunkAt(pos));
+                pos -= State.GetBaseVector();
+                OnChunkAdded?.Invoke(State.GetChunkAt(pos), new Vector3i(pos.X / EngineDefaults.ChunkWidth, pos.Y / EngineDefaults.ChunkHeight, pos.Z / EngineDefaults.ChunkDepth));
             }
 
             for (var i = 0; i < EngineDefaults.ChunkWidth; i++)
@@ -319,6 +311,7 @@ public class World
                 }
             }
         }
+        State.SerializeChangesToChangePacket(new Packet(new PacketHeader()));
     }
     
     private void RecalculateLight(Vector3i blockPlaced, BlockType type)
@@ -365,7 +358,7 @@ public class World
         return _players[id];
     }
     
-    public ushort GetMaxChunksCount()
+    public static ushort GetMaxChunksCount()
     {
         return WorldWidth / EngineDefaults.ChunkWidth * WorldHeight / EngineDefaults.ChunkHeight *
             WorldDepth / EngineDefaults.ChunkDepth;

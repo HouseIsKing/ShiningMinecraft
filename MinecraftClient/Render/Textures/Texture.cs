@@ -31,8 +31,8 @@ public class Texture(long handle, uint textureId, uint textureIndex)
         var format = BitConverter.ToInt32(header, 84);
         var blockSize = (CompressionFormat)format switch
         {
-            CompressionFormat.DXT1 => (8, 33776),
-            CompressionFormat.DXT5 => (16, 33779),
+            CompressionFormat.Dxt1 => (8, 33776),
+            CompressionFormat.Dxt5 => (16, 33779),
             _ => throw new Exception("Invalid texture file")
         };
         GL.CreateTextures(TextureTarget.Texture2D, 1, out uint textureId);

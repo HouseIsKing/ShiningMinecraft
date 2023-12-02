@@ -129,13 +129,16 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
 
     public override void SerializeChangesToChangePacket(Packet changePacket)
     {
+        base.SerializeChangesToChangePacket(changePacket);
         changePacket.Write(_changesCount);
         for (byte i = 0; i < _changes.Length; i++)
             if (_changes[i].Item1)
             {
                 changePacket.Write(i);
                 SerializeChangeToChangePacket(changePacket, i);
+                _changes[i].Item1 = false;
             }
+        _changesCount = 0;
     }
 
     private void SerializeChangeToChangePacket(Packet changePacket, byte change)
@@ -162,13 +165,17 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
 
     public override void SerializeChangesToRevertPacket(Packet revertPacket)
     {
+        base.SerializeChangesToRevertPacket(revertPacket);
         revertPacket.Write(_changesCount);
         for (byte i = 0; i < _changes.Length; i++)
             if (_changes[i].Item1)
             {
                 revertPacket.Write(i);
                 SerializeChangeToRevertPacket(revertPacket, i);
+                _changes[i].Item1 = false;
             }
+
+        _changesCount = 0;
     }
 
     private void SerializeChangeToRevertPacket(Packet revertPacket, byte change)
@@ -218,12 +225,5 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
             default:
                 throw new ArgumentOutOfRangeException(nameof(change), change, "Invalid Entity State Change");
         }
-    }
-
-    public override void FinalizeChanges()
-    {
-        base.FinalizeChanges();
-        _changesCount = 0;
-        for (var i = 0; i < _changes.Length; i++) _changes[i].Item1 = false;
     }
 }

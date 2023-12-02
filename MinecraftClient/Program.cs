@@ -11,7 +11,7 @@ file static class Program
         }
         else
         {
-            MinecraftClientSP client = new();
+            MinecraftClientSp client = new();
             client.Run();
         }
     }

@@ -102,30 +102,36 @@ public static class EngineDefaults
     {
         if (!IsIntersectingY(collider, block) || !IsIntersectingZ(collider, block)) return;
 
-        if (x < 0 && collider.Min.X >= block.Max.X)
-            x = Math.Max(x, block.Max.X - collider.Min.X);
-        else
-            x = Math.Min(x, block.Min.X - collider.Max.X);
+        x = x switch
+        {
+            < 0 when collider.Min.X >= block.Max.X => Math.Max(x, block.Max.X - collider.Min.X + 0.0001f),
+            > 0 when collider.Max.X <= block.Min.X => Math.Min(x, block.Min.X - collider.Max.X - 0.0001f),
+            _ => x
+        };
     }
 
     public static void ClipCollisionY(Box3 collider, Box3 block, ref float y)
     {
         if (!IsIntersectingX(collider, block) || !IsIntersectingZ(collider, block)) return;
 
-        if (y < 0 && collider.Min.Y >= block.Max.Y)
-            y = Math.Max(y, block.Max.Y - collider.Min.Y);
-        else
-            y = Math.Min(y, block.Min.Y - collider.Max.Y);
+        y = y switch
+        {
+            < 0 when collider.Min.Y >= block.Max.Y => Math.Max(y, block.Max.Y - collider.Min.Y + 0.0001f),
+            > 0 when collider.Max.Y <= block.Min.Y => Math.Min(y, block.Min.Y - collider.Max.Y - 0.0001f),
+            _ => y
+        };
     }
 
     public static void ClipCollisionZ(Box3 collider, Box3 block, ref float z)
     {
         if (!IsIntersectingX(collider, block) || !IsIntersectingY(collider, block)) return;
 
-        if (z < 0 && collider.Min.Z >= block.Max.Z)
-            z = Math.Max(z, block.Max.Z - collider.Min.Z);
-        else
-            z = Math.Min(z, block.Min.Z - collider.Max.Z);
+        z = z switch
+        {
+            < 0 when collider.Min.Z >= block.Max.Z => Math.Max(z, block.Max.Z - collider.Min.Z + 0.0001f),
+            > 0 when collider.Max.Z <= block.Min.Z => Math.Min(z, block.Min.Z - collider.Max.Z - 0.0001f),
+            _ => z
+        };
     }
 
     public static Vector3 GetFrontVector(float yaw, float pitch)
@@ -161,6 +167,8 @@ public static class EngineDefaults
     
     public delegate void TickStartHandler();
     public delegate void TickEndHandler();
-    public delegate void ChunkAddedHandler(ChunkState state);
+    public delegate void ChunkAddedHandler(ChunkState state, Vector3i index);
     public delegate void PlayerAddedHandler(PlayerState state);
+
+    public delegate void StateChangedHandler();
 }

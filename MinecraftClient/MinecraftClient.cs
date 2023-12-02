@@ -1,8 +1,10 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
-using MinecraftClient.Render.Entities.Player;
 using MinecraftClient.Render.World;
 using MinecraftLibrary.Engine;
+using MinecraftLibrary.Engine.States.Entities;
+using MinecraftLibrary.Input;
+using MinecraftLibrary.Network;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
@@ -14,8 +16,12 @@ namespace MinecraftClient;
 
 public abstract class MinecraftClient : GameWindow 
 {
-    private World World { get; }
-    private WorldRenderer WorldRenderer { get; }
+    protected World World { get; }
+    protected WorldRenderer WorldRenderer;
+    protected PlayerState Player;
+    protected ClientInput Input = new();
+    private float _ticker;
+    protected readonly Packet Packet = new(new PacketHeader());
     protected MinecraftClient(World world) : base(GameWindowSettings.Default,
         new NativeWindowSettings
         {
@@ -27,7 +33,8 @@ public abstract class MinecraftClient : GameWindow
         })
     {
         World = world;
-        WorldRenderer = new WorldRenderer();
+        World.OnTickStart += PreTick;
+        World.OnTickEnd += PostTick;
         GL.DebugMessageCallback(HandleDebug, IntPtr.Zero);
         GLFW.SetErrorCallback(HandleError);
         CursorState = CursorState.Grabbed;
@@ -36,8 +43,6 @@ public abstract class MinecraftClient : GameWindow
         GL.DepthFunc(DepthFunction.Lequal);
         GL.Enable(EnableCap.DepthTest);
         GL.Enable(EnableCap.CullFace);
-        World.GenerateLevel();
-        Console.WriteLine("Done loading world");
     }
 
     private static void HandleDebug(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userparam)
@@ -49,12 +54,28 @@ public abstract class MinecraftClient : GameWindow
     protected override void OnResize(ResizeEventArgs e)
     {
         base.OnResize(e);
-        //World.HandleWindowResize(e.Width, e.Height);
+        WorldRenderer.HandleWindowResize(e.Height, e.Width);
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
     {
         base.OnUpdateFrame(args);
+        Input.MouseX += MouseState.Delta.X;
+        Input.MouseY -= MouseState.Delta.Y;
+        Input.KeySet1 = (byte)(Convert.ToInt32(MouseState.IsButtonDown(MouseButton.Button1)) |
+                               (Convert.ToInt32(MouseState.IsButtonDown(MouseButton.Button2)) << 1) |
+                               (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.Space)) << 2) |
+                               (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.R)) << 3) |
+                               (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.G)) << 4) |
+                               (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.D1)) << 5) |
+                               (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.D2)) << 6) |
+                               (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.D3)) << 7));
+        Input.KeySet2 = (byte)(Convert.ToInt32(KeyboardState.IsKeyDown(Keys.D4)) |
+                               (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.D5)) << 1) |
+                               (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.W)) << 2) |
+                               (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.S)) << 3) |
+                               (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.A)) << 4) |
+                               (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.D)) << 5));
         if (KeyboardState.IsKeyDown(Keys.Escape)) Close();
     }
 
@@ -63,19 +84,31 @@ public abstract class MinecraftClient : GameWindow
         var start = Stopwatch.GetTimestamp();
         base.OnRenderFrame(args);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-        WorldRenderer.Render();
-        Camera.GetInstance().Yaw += MouseState.Delta.X;
-        Camera.GetInstance().Pitch -= MouseState.Delta.Y;
-        Camera.GetInstance().Position += Camera.GetInstance().GetFrontVector() * Convert.ToSingle(KeyboardState.IsKeyDown(Keys.W)) * 0.005f;
+        var i = (int)(_ticker / EngineDefaults.TickRate);
+        for (; i > 0; i--)
+        {
+            Packet.Reset();
+            World.Tick(Packet, true);
+            WorldRenderer.ApplyTickChanges(Packet);
+            _ticker -= EngineDefaults.TickRate;
+        }
+        WorldRenderer.Render(_ticker / EngineDefaults.TickRate);
+        //Camera.GetInstance().Yaw += MouseState.Delta.X;
+        //Camera.GetInstance().Pitch -= MouseState.Delta.Y;
+        //Camera.GetInstance().Position += Camera.GetInstance().GetFrontVector() * Convert.ToSingle(KeyboardState.IsKeyDown(Keys.W)) * 0.02f;
         //Console.WriteLine($"Yaw: {Camera.GetInstance().Yaw} Pitch: {Camera.GetInstance().Pitch}");
+        GL.Flush();
         SwapBuffers();
-        GL.Finish();
         var timeTook = (float)Stopwatch.GetElapsedTime(start).TotalSeconds;
-        Console.WriteLine($"Render took {timeTook} seconds");
+        if (timeTook > 0.01f) Console.WriteLine($"Render took {timeTook} seconds");
+        _ticker += timeTook;
     }
 
     private static void HandleError(ErrorCode errorCode, string description)
     {
         Console.WriteLine($"Error: {errorCode} - {description}");
     }
+
+    protected abstract void PreTick();
+    protected abstract void PostTick();
 }

@@ -6,4 +6,14 @@ public class MinecraftClientMP : MinecraftClient
     {
         throw new NotImplementedException("Error");
     }
+
+    protected override void PreTick()
+    {
+        throw new NotImplementedException();
+    }
+
+    protected override void PostTick()
+    {
+        throw new NotImplementedException();
+    }
 }

@@ -33,24 +33,31 @@ public sealed class ChunkState : State<ChunkState>
 
     public override void SerializeChangesToChangePacket(Packet changePacket)
     {
+        base.SerializeChangesToChangePacket(changePacket);
         changePacket.Write(_changesCount);
         for (ushort i = 0; i < _changes.Length; i++)
             if (_changes[i].Item1)
             {
                 changePacket.Write(i);
                 changePacket.Write((byte)Blocks[i]);
+                _changes[i].Item1 = false;
             }
+        _changesCount = 0;
     }
 
     public override void SerializeChangesToRevertPacket(Packet revertPacket)
     {
+        base.SerializeChangesToRevertPacket(revertPacket);
         revertPacket.Write(_changesCount);
         for (ushort i = 0; i < _changes.Length; i++)
             if (_changes[i].Item1)
             {
                 revertPacket.Write(i);
                 revertPacket.Write((byte)_changes[i].Item2);
+                _changes[i].Item1 = false;
             }
+
+        _changesCount = 0;
     }
 
     public override void DeserializeChanges(Packet changePacket)
@@ -62,13 +69,6 @@ public sealed class ChunkState : State<ChunkState>
             changePacket.Read(out byte blockType);
             Blocks[index] = (BlockType)blockType;
         }
-    }
-
-    public override void FinalizeChanges()
-    {
-        base.FinalizeChanges();
-        _changesCount = 0;
-        for (var i = 0; i < _changes.Length; i++) _changes[i].Item1 = false;
     }
 
     public void SetBlockAt(ushort index, BlockType blockType)

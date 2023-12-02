@@ -91,7 +91,9 @@ public abstract class LivingEntityState<TLivingEntityState> : EntityState<TLivin
             {
                 changePacket.Write(i);
                 SerializeChangeToChangePacket(changePacket, i);
+                _changes[i].Item1 = false;
             }
+        _changesCount = 0;
     }
 
     private void SerializeChangeToChangePacket(Packet changePacket, byte change)
@@ -119,7 +121,9 @@ public abstract class LivingEntityState<TLivingEntityState> : EntityState<TLivin
             {
                 revertPacket.Write(i);
                 SerializeChangeToRevertPacket(revertPacket, i);
+                _changes[i].Item1 = false;
             }
+        _changesCount = 0;
     }
 
     private void SerializeChangeToRevertPacket(Packet revertPacket, byte change)
@@ -160,12 +164,5 @@ public abstract class LivingEntityState<TLivingEntityState> : EntityState<TLivin
                 packet.Read(out _verticalInput);
                 break;
         }
-    }
-
-    public override void FinalizeChanges()
-    {
-        base.FinalizeChanges();
-        _changesCount = 0;
-        for (var i = 0; i < _changes.Length; i++) _changes[i].Item1 = false;
     }
 }

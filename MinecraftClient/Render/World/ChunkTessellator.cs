@@ -15,6 +15,7 @@ public sealed class ChunkTessellator : Tessellator
     private readonly IntPtr _chunksTransformsPointer;
     private readonly ushort _chunksCount;
     private static readonly uint Vao;
+    private static readonly byte[] VertexHelper = new byte[4];
     
     private const int VboBufferSize = EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * sizeof(uint);
     private const int EboBufferSize = EngineDefaults.ChunkWidth / 2 * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * 3 * sizeof(uint);
@@ -133,7 +134,11 @@ public sealed class ChunkTessellator : Tessellator
         var finalIndex = chunkId * VboBufferSize / sizeof(uint) + index;
         var constructedVertex = (uint)blockType << 16;
         constructedVertex |= (uint)light << 10;
-        Marshal.Copy(BitConverter.GetBytes(constructedVertex), 0, _vboPointer + finalIndex * sizeof(uint), sizeof(uint));
+        VertexHelper[3] = (byte)(constructedVertex >> 24);
+        VertexHelper[2] = (byte)((constructedVertex >> 16) & 0xFF);
+        VertexHelper[1] = (byte)((constructedVertex >> 8) & 0xFF);
+        VertexHelper[0] = (byte)(constructedVertex & 0xFF);
+        Marshal.Copy(VertexHelper, 0, _vboPointer + finalIndex * sizeof(uint), sizeof(uint));
     }
     
     public void SetChunkTransform(ushort chunkId, Matrix4 transform)

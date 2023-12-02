@@ -14,5 +14,4 @@ void main()
 {
     vec4 textureColor = texture(textures[fragTextureIndex] , fragTexture);
 	FragColor = fragColor * textureColor;
-	//FragColor = color;
 }

@@ -11,14 +11,16 @@ public abstract class LivingEntity<TLivingEntityState> : Entity<TLivingEntitySta
 
     protected void CalculateVelocityAndMove()
     {
-        Vector3 velocity = State.Velocity;
-        float speedModifier = 0.1f;
+        var velocity = State.Velocity;
+        var speedModifier = 0.1f;
         if (State is { JumpInput: true, IsGrounded: true }) velocity.Y = 0.5f;
         if (!State.IsGrounded) speedModifier *= 0.2f;
         velocity.Y -= 0.08f;
-        Vector3 rotation = State.Rotation;
-        if (State.HorizontalInput * State.HorizontalInput + State.VerticalInput * State.VerticalInput > 0)
+        var rotation = State.Rotation;
+        var d = State.HorizontalInput * State.HorizontalInput + State.VerticalInput * State.VerticalInput;
+        if (d > 0)
         {
+            speedModifier /= MathF.Sqrt(d);
             velocity.X += speedModifier * (State.VerticalInput * MathF.Cos(MathHelper.DegreesToRadians(rotation.Y)) - State.HorizontalInput * MathF.Sin(MathHelper.DegreesToRadians(rotation.Y)));
             velocity.Z += speedModifier * (State.VerticalInput * MathF.Sin(MathHelper.DegreesToRadians(rotation.Y)) + State.HorizontalInput * MathF.Cos(MathHelper.DegreesToRadians(rotation.Y)));
         }
@@ -34,6 +36,9 @@ public abstract class LivingEntity<TLivingEntityState> : Entity<TLivingEntitySta
             velocity.Z *= 0.7f;
         }
         State.Velocity = velocity;
+        State.HorizontalInput = 0;
+        State.VerticalInput = 0;
+        State.JumpInput = false;
     }
 
     public override void Tick()

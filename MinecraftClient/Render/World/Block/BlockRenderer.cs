@@ -34,12 +34,12 @@ public abstract class BlockRenderer(MinecraftLibrary.Engine.Blocks.Block block)
             offset += 2 * 16;
             var textureIndexes = new uint[]
             {
-                blockRender.GetIndexTexture(BlockFaces.Top), blockRender.GetColor(BlockFaces.Top), blockRender.GetSpecialFactor(), 0,
-                blockRender.GetIndexTexture(BlockFaces.Bottom), blockRender.GetColor(BlockFaces.Bottom), blockRender.GetSpecialFactor(), 0,
-                blockRender.GetIndexTexture(BlockFaces.East), blockRender.GetColor(BlockFaces.East), blockRender.GetSpecialFactor(), 0,
-                blockRender.GetIndexTexture(BlockFaces.West), blockRender.GetColor(BlockFaces.West), blockRender.GetSpecialFactor(), 0,
-                blockRender.GetIndexTexture(BlockFaces.North), blockRender.GetColor(BlockFaces.North), blockRender.GetSpecialFactor(), 0,
-                blockRender.GetIndexTexture(BlockFaces.South), blockRender.GetColor(BlockFaces.South), blockRender.GetSpecialFactor(), 0,
+                blockRender.GetIndexTexture(BlockFaces.Top), blockRender.GetColor(BlockFaces.Top), 0, 0,
+                blockRender.GetIndexTexture(BlockFaces.Bottom), blockRender.GetColor(BlockFaces.Bottom), 0, 0,
+                blockRender.GetIndexTexture(BlockFaces.East), blockRender.GetColor(BlockFaces.East), 0, 0,
+                blockRender.GetIndexTexture(BlockFaces.West), blockRender.GetColor(BlockFaces.West), 0, 0,
+                blockRender.GetIndexTexture(BlockFaces.North), blockRender.GetColor(BlockFaces.North), 0, 0,
+                blockRender.GetIndexTexture(BlockFaces.South), blockRender.GetColor(BlockFaces.South), 0, 0
             };
             Buffer.BlockCopy(textureIndexes, 0, SsboData, offset, 16 * 6);
             offset += 16 * 6;

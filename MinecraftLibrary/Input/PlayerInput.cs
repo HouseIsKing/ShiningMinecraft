@@ -2,18 +2,14 @@
 
 namespace MinecraftLibrary.Input;
 
-public struct PlayerInput
+public class PlayerInput
 {
-    private float MouseX = 0.0f;
-    private float MouseY = 0.0f;
-    private byte KeySet1Pressed = 0;
-    private byte KeySet2Pressed = 0;
-    private byte KeySet1Hold = 0;
-    private byte KeySet2Hold = 0;
-
-    public PlayerInput()
-    {
-    }
+    private float MouseX;
+    private float MouseY;
+    private byte KeySet1Pressed;
+    private byte KeySet2Pressed;
+    private byte KeySet1Hold;
+    private byte KeySet2Hold;
 
     public bool IsKeyPressed(KeySet key)
     {

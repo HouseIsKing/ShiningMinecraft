@@ -96,7 +96,9 @@ public sealed class PlayerState : LivingEntityState<PlayerState>
             {
                 changePacket.Write(i);
                 SerializeChangeToChangePacket(changePacket, i);
+                _changes[i].Item1 = false;
             }
+        _changesCount = 0;
     }
 
     private void SerializeChangeToChangePacket(Packet changePacket, byte change)
@@ -127,7 +129,9 @@ public sealed class PlayerState : LivingEntityState<PlayerState>
             {
                 revertPacket.Write(i);
                 SerializeChangeToRevertPacket(revertPacket, i);
+                _changes[i].Item1 = false;
             }
+        _changesCount = 0;
     }
 
     private void SerializeChangeToRevertPacket(Packet revertPacket, byte change)
@@ -178,13 +182,6 @@ public sealed class PlayerState : LivingEntityState<PlayerState>
                 PlayerInput.Deserialize(packet);
                 break;
         }
-    }
-
-    public override void FinalizeChanges()
-    {
-        base.FinalizeChanges();
-        _changesCount = 0;
-        for (var i = 0; i < _changes.Length; i++) _changes[i].Item1 = false;
     }
 
     public void ApplyClientInput(ClientInput clientInput)
