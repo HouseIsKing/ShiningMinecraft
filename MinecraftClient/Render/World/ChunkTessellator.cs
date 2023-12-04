@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using MinecraftClient.Render.Shaders;
 using MinecraftLibrary.Engine;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
@@ -18,7 +19,7 @@ public sealed class ChunkTessellator : Tessellator
     private static readonly byte[] VertexHelper = new byte[4];
     
     private const int VboBufferSize = EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * sizeof(uint);
-    private const int EboBufferSize = EngineDefaults.ChunkWidth / 2 * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * 3 * sizeof(uint);
+    private const int EboBufferSize = EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * sizeof(uint);
 
     static ChunkTessellator()
     {
@@ -56,7 +57,7 @@ public sealed class ChunkTessellator : Tessellator
         GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4, _chunksTransformsBuffer);
         
         GL.CreateBuffers(1, out _drawElementsIndirectCommandsBuffer);
-        helper = 3 * chunksCount * Marshal.SizeOf<GlDrawElementsIndirectCommand>();
+        helper = chunksCount * Marshal.SizeOf<GlDrawElementsIndirectCommand>();
         GL.NamedBufferStorage(_drawElementsIndirectCommandsBuffer,
             helper, new byte[helper],
             BufferStorageFlags.MapWriteBit | BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapCoherentBit);
@@ -71,13 +72,7 @@ public sealed class ChunkTessellator : Tessellator
                 instanceCount = 1
             };
             Marshal.Copy(EngineDefaults.GetBytes(command).ToArray(), 0,
-                _drawElementsIndirectCommandsPointer + 3 * i * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
-                Marshal.SizeOf<GlDrawElementsIndirectCommand>());
-            Marshal.Copy(EngineDefaults.GetBytes(command).ToArray(), 0,
-                _drawElementsIndirectCommandsPointer + (3 * i + 1) * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
-                Marshal.SizeOf<GlDrawElementsIndirectCommand>());
-            Marshal.Copy(EngineDefaults.GetBytes(command).ToArray(), 0,
-                _drawElementsIndirectCommandsPointer + (3 * i + 2) * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
+                _drawElementsIndirectCommandsPointer + i * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
                 Marshal.SizeOf<GlDrawElementsIndirectCommand>());
         }
         
@@ -95,50 +90,33 @@ public sealed class ChunkTessellator : Tessellator
         GL.VertexArrayElementBuffer(Vao, Ebo);
     }
 
-    public void SetTriangles(ushort chunkId, uint[] triangles0, uint[] triangles1, uint[] triangles2)
+    public void SetTriangles(ushort chunkId, uint[] triangles)
     {
-        var i = chunkId * EboBufferSize / sizeof(uint);
-        Marshal.Copy(BitConverter.GetBytes(triangles0.Length), 0,
-            _drawElementsIndirectCommandsPointer + 3 * chunkId * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
+        var offset = chunkId * EboBufferSize;
+        Marshal.Copy(BitConverter.GetBytes(triangles.Length), 0,
+            _drawElementsIndirectCommandsPointer + chunkId * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
             sizeof(uint));
-        
-        Marshal.Copy(BitConverter.GetBytes(triangles1.Length), 0,
-            _drawElementsIndirectCommandsPointer + (3 * chunkId + 1) * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
-            sizeof(uint));
-        Marshal.Copy(BitConverter.GetBytes(chunkId * EboBufferSize / sizeof(uint) + triangles0.Length), 0,
-            _drawElementsIndirectCommandsPointer + (3 * chunkId + 1) * Marshal.SizeOf<GlDrawElementsIndirectCommand>() +
-            8, sizeof(uint));
-        
-        Marshal.Copy(BitConverter.GetBytes(triangles2.Length), 0,
-            _drawElementsIndirectCommandsPointer + (3 * chunkId + 2) * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
-            sizeof(uint));
-        Marshal.Copy(
-            BitConverter.GetBytes(chunkId * EboBufferSize / sizeof(uint) + triangles0.Length + triangles1.Length), 0,
-            _drawElementsIndirectCommandsPointer + (3 * chunkId + 2) * Marshal.SizeOf<GlDrawElementsIndirectCommand>() +
-            8, sizeof(uint));
-        
-        for (var j = 0; j < triangles0.Length; i++, j++) Marshal.Copy(BitConverter.GetBytes(triangles0[j]), 0, _eboPointer + i * sizeof(uint), sizeof(uint));
-        for (var j = 0; j < triangles1.Length; i++, j++) Marshal.Copy(BitConverter.GetBytes(triangles1[j]), 0, _eboPointer + i * sizeof(uint), sizeof(uint));
-        for (var j = 0; j < triangles2.Length; i++, j++) Marshal.Copy(BitConverter.GetBytes(triangles2[j]), 0, _eboPointer + i * sizeof(uint), sizeof(uint));
+        Marshal.Copy((int[])(object)triangles, 0, _eboPointer + offset, triangles.Length);
     }
 
     public override void Draw()
     {
+        Shader.ChunkShader.Use();
         GL.BindBuffer(BufferTarget.DrawIndirectBuffer, _drawElementsIndirectCommandsBuffer);
         GL.BindVertexArray(Vao);
-        GL.MultiDrawElementsIndirect(PrimitiveType.Points, DrawElementsType.UnsignedInt, IntPtr.Zero, _chunksCount * 3, Marshal.SizeOf<GlDrawElementsIndirectCommand>());
+        GL.MultiDrawElementsIndirect(PrimitiveType.Points, DrawElementsType.UnsignedInt, IntPtr.Zero, _chunksCount, Marshal.SizeOf<GlDrawElementsIndirectCommand>());
     }
 
     public void SetVertex(ushort chunkId, ushort index, BlockType blockType, byte light)
     {
-        var finalIndex = chunkId * VboBufferSize / sizeof(uint) + index;
+        var finalIndex = chunkId * VboBufferSize + index * sizeof(uint);
         var constructedVertex = (uint)blockType << 16;
         constructedVertex |= (uint)light << 10;
         VertexHelper[3] = (byte)(constructedVertex >> 24);
         VertexHelper[2] = (byte)((constructedVertex >> 16) & 0xFF);
         VertexHelper[1] = (byte)((constructedVertex >> 8) & 0xFF);
         VertexHelper[0] = (byte)(constructedVertex & 0xFF);
-        Marshal.Copy(VertexHelper, 0, _vboPointer + finalIndex * sizeof(uint), sizeof(uint));
+        Marshal.Copy(VertexHelper, 0, _vboPointer + finalIndex, sizeof(uint));
     }
     
     public void SetChunkTransform(ushort chunkId, Matrix4 transform)

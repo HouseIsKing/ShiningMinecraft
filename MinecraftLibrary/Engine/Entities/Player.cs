@@ -9,9 +9,9 @@ public sealed class Player : LivingEntity<PlayerState>
 {
     private readonly Queue<KeyValuePair<ulong, ClientInput>> _inputQueue = new();
     public ulong LastInputProcessed { get; private set; }
-    private bool _foundBlock;
-    private Vector3i _hitPosition;
-    private BlockFaces _hitFace;
+    public bool FoundBlock { get; private set; }
+    public Vector3i HitPosition { get; private set; }
+    public BlockFaces HitFace { get; private set; }
 
     public Player(PlayerState state) : base(state)
     {
@@ -42,7 +42,7 @@ public sealed class Player : LivingEntity<PlayerState>
 
     private void FindClosestFace()
     {
-        _foundBlock = false;
+        FoundBlock = false;
         var forwardVector = EngineDefaults.GetFrontVector(State.Rotation.Y, State.Pitch);
         var position = new Vector3(State.Position.X, State.Position.Y + EngineDefaults.CameraOffset - EngineDefaults.PlayerSize.Y, State.Position.Z);
         var right = forwardVector.X > 0.0F;
@@ -67,13 +67,13 @@ public sealed class Player : LivingEntity<PlayerState>
                 if (totalDistance > maxDistance) return;
 
                 position += xDistanceToComplete * forwardVector;
-                _hitPosition = right
+                HitPosition = right
                     ? new Vector3i((int)position.X, (int)position.Y, (int)position.Z)
                     : new Vector3i((int)position.X - 1, (int)position.Y, (int)position.Z);
-                if (!World.GetInstance()!.GetBlockAt(_hitPosition).IsSolid()) continue;
+                if (!World.GetInstance()!.GetBlockAt(HitPosition).IsSolid()) continue;
 
-                _foundBlock = true;
-                _hitFace = right ? BlockFaces.West : BlockFaces.East;
+                FoundBlock = true;
+                HitFace = right ? BlockFaces.West : BlockFaces.East;
                 break;
             }
 
@@ -83,13 +83,13 @@ public sealed class Player : LivingEntity<PlayerState>
                 if (totalDistance > maxDistance) return;
 
                 position += yDistanceToComplete * forwardVector;
-                _hitPosition = up
+                HitPosition = up
                     ? new Vector3i((int)position.X, (int)position.Y, (int)position.Z)
                     : new Vector3i((int)position.X, (int)position.Y - 1, (int)position.Z);
-                if (!World.GetInstance()!.GetBlockAt(_hitPosition).IsSolid()) continue;
+                if (!World.GetInstance()!.GetBlockAt(HitPosition).IsSolid()) continue;
 
-                _foundBlock = true;
-                _hitFace = up ? BlockFaces.Bottom : BlockFaces.Top;
+                FoundBlock = true;
+                HitFace = up ? BlockFaces.Bottom : BlockFaces.Top;
                 break;
             }
 
@@ -97,13 +97,13 @@ public sealed class Player : LivingEntity<PlayerState>
             if (totalDistance > maxDistance) return;
 
             position += zDistanceToComplete * forwardVector;
-            _hitPosition = forward
+            HitPosition = forward
                 ? new Vector3i((int)position.X, (int)position.Y, (int)position.Z)
                 : new Vector3i((int)position.X, (int)position.Y, (int)position.Z - 1);
-            if (!World.GetInstance()!.GetBlockAt(_hitPosition).IsSolid()) continue;
+            if (!World.GetInstance()!.GetBlockAt(HitPosition).IsSolid()) continue;
 
-            _foundBlock = true;
-            _hitFace = forward ? BlockFaces.South : BlockFaces.North;
+            FoundBlock = true;
+            HitFace = forward ? BlockFaces.South : BlockFaces.North;
             break;
         }
     }
@@ -112,25 +112,25 @@ public sealed class Player : LivingEntity<PlayerState>
     {
         var blockToPlace = Block.GetBlock(State.CurrentSelectedBlock);
         var blockBox = blockToPlace.BlockBounds;
-        switch (_hitFace)
+        switch (HitFace)
         {
             case BlockFaces.Bottom:
-                blockBox.Translate(_hitPosition - Vector3i.UnitY);
+                blockBox.Translate(HitPosition - Vector3i.UnitY);
                 break;
             case BlockFaces.Top:
-                blockBox.Translate(_hitPosition + Vector3i.UnitY);
+                blockBox.Translate(HitPosition + Vector3i.UnitY);
                 break;
             case BlockFaces.East:
-                blockBox.Translate(_hitPosition + Vector3i.UnitX);
+                blockBox.Translate(HitPosition + Vector3i.UnitX);
                 break;
             case BlockFaces.West:
-                blockBox.Translate(_hitPosition - Vector3i.UnitX);
+                blockBox.Translate(HitPosition - Vector3i.UnitX);
                 break;
             case BlockFaces.North:
-                blockBox.Translate(_hitPosition + Vector3i.UnitZ);
+                blockBox.Translate(HitPosition + Vector3i.UnitZ);
                 break;
             case BlockFaces.South:
-                blockBox.Translate(_hitPosition - Vector3i.UnitZ);
+                blockBox.Translate(HitPosition - Vector3i.UnitZ);
                 break;
         }
 
@@ -155,12 +155,12 @@ public sealed class Player : LivingEntity<PlayerState>
         if (input.IsKeyPressed(KeySet.Four)) State.CurrentSelectedBlock = BlockType.Planks;
         if (input.IsKeyPressed(KeySet.Five)) State.CurrentSelectedBlock = BlockType.Sapling;
         if (input.IsKeyPressed(KeySet.RightMouseButton)) State.Mode = !State.Mode;
-        if (input.IsKeyPressed(KeySet.LeftMouseButton) && _foundBlock)
+        if (input.IsKeyPressed(KeySet.LeftMouseButton) && FoundBlock)
         {
             if (State.Mode)
                 PlaceBlock();
             else
-                World.GetInstance()?.BreakBlock(_hitPosition);
+                World.GetInstance()?.BreakBlock(HitPosition);
         }
 
         if (!input.IsKeyPressed(KeySet.Reset)) return;

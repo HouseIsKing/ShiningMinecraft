@@ -14,7 +14,7 @@ public class Block
     {
         return Blocks[(int)type];
     }
-    public BlockType Type { get; private set; }
+    public BlockType Type { get; }
     public Box3 BlockBounds { get; private set; }
 
     protected Block(BlockType type, Box3 blockBounds)

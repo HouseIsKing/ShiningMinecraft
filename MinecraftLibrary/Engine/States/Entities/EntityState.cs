@@ -14,6 +14,7 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
     private Vector3 _velocity;
     public ushort EntityId { get; }
     public EntityType EntityType { get; }
+    public bool DidSpawn { get; internal set; }
 
     protected EntityState(ushort id, EntityType type)
     {

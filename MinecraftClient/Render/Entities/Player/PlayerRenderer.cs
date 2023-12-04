@@ -9,6 +9,7 @@ public sealed class PlayerRenderer(PlayerState player)
 {
     private PlayerState Player { get; } = player;
     private PlayerState OldPlayerState { get; } = new(0);
+    private readonly SelectionHighlightTessellator _selectionHighlightTessellator = new();
 
     public void UpdateRenderer(float delta)
     {
@@ -25,5 +26,15 @@ public sealed class PlayerRenderer(PlayerState player)
     public ushort GetPlayerId()
     {
         return Player.EntityId;
+    }
+
+    public void RenderSelectionHighlight()
+    {
+        var world = MinecraftLibrary.Engine.World.GetInstance();
+        if (world == null || !Player.DidSpawn) return;
+        var p = world.GetPlayer(Player.EntityId);
+        if (p.State.Mode || !p.FoundBlock) return;
+        _selectionHighlightTessellator.SetVertex(world.GetBlockAt(p.HitPosition).Type, world.GetBrightnessAt(p.HitPosition), p.HitPosition);
+        _selectionHighlightTessellator.Draw();
     }
 }

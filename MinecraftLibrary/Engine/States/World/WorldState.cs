@@ -425,12 +425,14 @@ public sealed class WorldState : State<WorldState>
 
     public void RegisterPlayer(PlayerState state)
     {
+        state.DidSpawn = true;
         state.OnChange += PlayerChanged;
         _players.Add(state.EntityId, state);
     }
 
     public void RegisterBlockParticle(BlockParticleEntityState state)
     {
+        state.DidSpawn = true;
         state.OnChange += BlockParticleChanged;
         _blockParticles.Add(state.EntityId, state);
     }

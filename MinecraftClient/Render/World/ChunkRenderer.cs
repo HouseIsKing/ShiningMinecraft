@@ -14,7 +14,7 @@ public sealed class ChunkRenderer
 
     private readonly HashSet<ushort> _dirtyVertexes =
         new(EngineDefaults.ChunkHeight * EngineDefaults.ChunkWidth * EngineDefaults.ChunkDepth);
-    private readonly List<uint>[] _triangles = { new(), new(), new() };
+    private readonly List<uint> _triangles = new();
 
     private Vector3 Position { get; }
     private static Vector3 Rotation => Vector3.Zero;
@@ -60,31 +60,23 @@ public sealed class ChunkRenderer
 
     private void BuildTriangles(ChunkTessellator tessellator)
     {
-        _triangles[0].Clear();
-        _triangles[1].Clear();
-        _triangles[2].Clear();
+        _triangles.Clear();
         for (ushort i = 0; i < EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth; i++)
-            if (_state.GetBlockAt(i) != BlockType.Air)
-                for (var j = 0; j < 3; j++)
-                    if (ShouldDrawCubeFace(i, (BlockFaces)(j * 2)) || ShouldDrawCubeFace(i, (BlockFaces)(j * 2 + 1)))
-                        _triangles[j].Add(i);
-        tessellator.SetTriangles(ChunkId, _triangles[0].ToArray(), _triangles[1].ToArray(), _triangles[2].ToArray());
+            if (_state.GetBlockAt(i) != BlockType.Air && ShouldDrawCube(i)) 
+                _triangles.Add(i);
+        tessellator.SetTriangles(ChunkId, _triangles.ToArray());
     }
 
-    private bool ShouldDrawCubeFace(ushort index, BlockFaces face)
+    private bool ShouldDrawCube(ushort index)
     {
         var pos = EngineDefaults.GetVectorFromIndex(index) + _state.ChunkPosition;
         var world = MinecraftLibrary.Engine.World.GetInstance()!;
-        return face switch
-        {
-            BlockFaces.Bottom => !world.GetBlockAt(pos - Vector3i.UnitY).IsSolid(),
-            BlockFaces.Top => !world.GetBlockAt(pos + Vector3i.UnitY).IsSolid(),
-            BlockFaces.West => !world.GetBlockAt(pos - Vector3i.UnitX).IsSolid(),
-            BlockFaces.East => !world.GetBlockAt(pos + Vector3i.UnitX).IsSolid(),
-            BlockFaces.North => !world.GetBlockAt(pos + Vector3i.UnitZ).IsSolid(),
-            BlockFaces.South => !world.GetBlockAt(pos - Vector3i.UnitZ).IsSolid(),
-            _ => false
-        };
+        return !world.GetBlockAt(pos + Vector3i.UnitY).IsSolid() ||
+               !world.GetBlockAt(pos - Vector3i.UnitY).IsSolid() ||
+               !world.GetBlockAt(pos + Vector3i.UnitX).IsSolid() ||
+               !world.GetBlockAt(pos - Vector3i.UnitX).IsSolid() ||
+               !world.GetBlockAt(pos + Vector3i.UnitZ).IsSolid() ||
+               !world.GetBlockAt(pos - Vector3i.UnitZ).IsSolid();
     }
 
     public void UpdateRenderer(ChunkTessellator tessellator)

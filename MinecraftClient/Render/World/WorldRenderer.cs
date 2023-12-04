@@ -70,7 +70,7 @@ public sealed class WorldRenderer
         var world = MinecraftLibrary.Engine.World.GetInstance()!;
         _chunkTessellator = new ChunkTessellator(MinecraftLibrary.Engine.World.GetMaxChunksCount());
         world.OnChunkAdded += OnChunkAdded;
-        Shader.MainShader.Use();
+        Shader.ChunkShader.Use();
         InitFog();
         InitCameraInfo();
         InitWorldInfo();
@@ -121,6 +121,9 @@ public sealed class WorldRenderer
         }
 
         _chunkTessellator.Draw();
+        GL.Enable(EnableCap.Blend);
+        _playerRenderer.RenderSelectionHighlight();
+        GL.Disable(EnableCap.Blend);
     }
 
     private void ApplyTickChunksChanges(Packet changePacket)

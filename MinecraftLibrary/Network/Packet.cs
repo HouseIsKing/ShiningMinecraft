@@ -55,7 +55,8 @@ public sealed class Packet(PacketHeader header)
 
     public void Write(ushort item)
     {
-        Write(BitConverter.GetBytes(item));
+        Write((byte)(item & 0xFF));
+        Write((byte)(item >> 8));
     }
 
     public void Write(byte item)
@@ -84,7 +85,7 @@ public sealed class Packet(PacketHeader header)
 
     public void Write(bool data)
     {
-        Write(BitConverter.GetBytes(data));
+        Write(Convert.ToByte(data));
     }
     
     public void Write(Vector2i data)

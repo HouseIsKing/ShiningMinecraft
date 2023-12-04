@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
+using MinecraftClient.Render.Entities.Player;
 using MinecraftClient.Render.World;
 using MinecraftLibrary.Engine;
 using MinecraftLibrary.Engine.States.Entities;
@@ -33,6 +34,8 @@ public abstract class MinecraftClient : GameWindow
         })
     {
         World = world;
+        Player = world.SpawnPlayer();
+        WorldRenderer = new WorldRenderer(new PlayerRenderer(Player));
         World.OnTickStart += PreTick;
         World.OnTickEnd += PostTick;
         GL.DebugMessageCallback(HandleDebug, IntPtr.Zero);
@@ -42,10 +45,11 @@ public abstract class MinecraftClient : GameWindow
         GL.ClearDepth(1.0f);
         GL.DepthFunc(DepthFunction.Lequal);
         GL.Enable(EnableCap.DepthTest);
+        GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
         GL.Enable(EnableCap.CullFace);
     }
 
-    private static void HandleDebug(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userparam)
+    private static void HandleDebug(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
     {
         if (severity == DebugSeverity.DebugSeverityNotification) return;
         Console.WriteLine($"[{severity}] {Marshal.PtrToStringAnsi(message, length)}");
@@ -93,10 +97,6 @@ public abstract class MinecraftClient : GameWindow
             _ticker -= EngineDefaults.TickRate;
         }
         WorldRenderer.Render(_ticker / EngineDefaults.TickRate);
-        //Camera.GetInstance().Yaw += MouseState.Delta.X;
-        //Camera.GetInstance().Pitch -= MouseState.Delta.Y;
-        //Camera.GetInstance().Position += Camera.GetInstance().GetFrontVector() * Convert.ToSingle(KeyboardState.IsKeyDown(Keys.W)) * 0.02f;
-        //Console.WriteLine($"Yaw: {Camera.GetInstance().Yaw} Pitch: {Camera.GetInstance().Pitch}");
         GL.Flush();
         SwapBuffers();
         var timeTook = (float)Stopwatch.GetElapsedTime(start).TotalSeconds;

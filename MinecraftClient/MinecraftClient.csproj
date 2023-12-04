@@ -27,10 +27,10 @@
       <None Update="Render\Shaders\GUIFragmentShader.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\FragmentShader.glsl">
+      <None Update="Render\Shaders\ChunkFS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\VertexShader.glsl">
+      <None Update="Render\Shaders\ChunkVS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
       <None Update="Render\Textures\Cobblestone.dds">
@@ -51,16 +51,16 @@
       <None Update="Render\Textures\Dirt.dds">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\GeometryShader.glsl">
+      <None Update="Render\Shaders\ChunkGS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\SelectionHighlightVShader.glsl">
+      <None Update="Render\Shaders\SelectionHighlightVS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\SelectionHighlightGShader.glsl">
+      <None Update="Render\Shaders\SelectionHighlightGS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\SelectionHighlightFShader.glsl">
+      <None Update="Render\Shaders\SelectionHighlightFS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
     </ItemGroup>
