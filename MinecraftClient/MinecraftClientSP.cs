@@ -19,7 +19,7 @@ public sealed class MinecraftClientSp : MinecraftClient
         if (!Player.DidSpawn) return;
         Input.MouseX *= 0.4f;
         Input.MouseY *= 0.4f;
-        World.GetInstance()?.GetPlayer(Player.EntityId).AddInput(_inputId++, Input);
+        World.Instance.GetPlayer(Player.EntityId).AddInput(_inputId++, Input);
         Input = new ClientInput();
     }
 

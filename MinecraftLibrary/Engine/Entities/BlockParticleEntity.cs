@@ -9,7 +9,7 @@ public sealed class BlockParticleEntity(BlockParticleEntityState state) : Entity
     {
         base.Tick();
         State.LifeTime++;
-        if (State.LifeTime >= State.MaxLifeTime) World.GetInstance()?.DespawnBlockParticleEntity(State.EntityId);
+        if (State.LifeTime >= State.MaxLifeTime) World.Instance.DespawnBlockParticleEntity(State.EntityId);
         base.Tick();
         var velocity = State.Velocity;
         velocity.Y -= 0.06f;

@@ -1,3 +1,4 @@
+using System.Reflection.Metadata;
 using MinecraftClient.Render.Entities.Player;
 using MinecraftLibrary.Engine;
 using MinecraftLibrary.Engine.Blocks;
@@ -38,13 +39,18 @@ public sealed class ChunkRenderer
     private byte BuildLightByte(ushort index)
     {
         var pos = EngineDefaults.GetVectorFromIndex(index) + _state.ChunkPosition;
-        var world = MinecraftLibrary.Engine.World.GetInstance()!;
+        var world = MinecraftLibrary.Engine.World.Instance;
         var result = world.GetBrightnessAt(pos + Vector3i.UnitY);
         result |= (byte)(world.GetBrightnessAt(pos + Vector3i.UnitX) << 2);
         result |= (byte)(world.GetBrightnessAt(pos - Vector3i.UnitX) << 3);
         result |= (byte)(world.GetBrightnessAt(pos + Vector3i.UnitZ) << 4);
         result |= (byte)(world.GetBrightnessAt(pos - Vector3i.UnitZ) << 5);
         return result;
+    }
+    
+    public void NotifyBlockChange(ushort index)
+    {
+        _dirtyVertexes.Add(index);
     }
 
     public void UpdateRendererChanges(Packet packet)
@@ -53,8 +59,22 @@ public sealed class ChunkRenderer
         for (var i = 0; i < changesCount; i++)
         {
             packet.Read(out ushort index);
-            _dirtyVertexes.Add(index);
             packet.Read(out byte _);
+            NotifyBlockChange(index);
+            if (MinecraftLibrary.Engine.Blocks.Block.GetBlock(_state.GetBlockAt(index)).IsSolid()) continue;
+            var helper = EngineDefaults.GetVectorFromIndex(index) + _state.ChunkPosition;
+            var pos = helper + Vector3i.UnitY;
+            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
+            pos = helper - Vector3i.UnitY;
+            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
+            pos = helper + Vector3i.UnitX;
+            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
+            pos = helper - Vector3i.UnitX;
+            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
+            pos = helper + Vector3i.UnitZ;
+            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
+            pos = helper - Vector3i.UnitZ;
+            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
         }
     }
 
@@ -70,7 +90,7 @@ public sealed class ChunkRenderer
     private bool ShouldDrawCube(ushort index)
     {
         var pos = EngineDefaults.GetVectorFromIndex(index) + _state.ChunkPosition;
-        var world = MinecraftLibrary.Engine.World.GetInstance()!;
+        var world = MinecraftLibrary.Engine.World.Instance;
         return !world.GetBlockAt(pos + Vector3i.UnitY).IsSolid() ||
                !world.GetBlockAt(pos - Vector3i.UnitY).IsSolid() ||
                !world.GetBlockAt(pos + Vector3i.UnitX).IsSolid() ||
@@ -84,6 +104,16 @@ public sealed class ChunkRenderer
         foreach (var vertex in _dirtyVertexes) tessellator.SetVertex(ChunkId, vertex, _state.GetBlockAt(vertex), BuildLightByte(vertex));
         BuildTriangles(tessellator);
         _dirtyVertexes.Clear();
+    }
+
+    public void LightUpdateColumn(Vector2i pos)
+    {
+        var index = EngineDefaults.GetIndexFromVector(new Vector3i(pos.X, 0, pos.Y));
+        for (var i = 0; i < EngineDefaults.ChunkHeight; i++)
+        {
+            _dirtyVertexes.Add(index);
+            index += EngineDefaults.ChunkDepth;
+        }
     }
 
     public override int GetHashCode()

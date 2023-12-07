@@ -28,7 +28,7 @@ public abstract class MinecraftClient : GameWindow
         {
             API = ContextAPI.OpenGL, APIVersion = new Version(4, 6), Vsync = VSyncMode.Off,
             Size = new Vector2i(1280, 720), Title = "Shining Minecraft Client", NumberOfSamples = 4,
-            Profile = ContextProfile.Core, MinimumSize = new Vector2i(640, 480), WindowState = WindowState.Normal,
+            Profile = ContextProfile.Core, MinimumSize = new Vector2i(640, 480), WindowState = WindowState.Fullscreen,
             WindowBorder = WindowBorder.Resizable, CurrentMonitor = Monitors.GetPrimaryMonitor().Handle,
             Flags = ContextFlags.Debug, StartVisible = true, StartFocused = true
         })
@@ -91,17 +91,19 @@ public abstract class MinecraftClient : GameWindow
         var i = (int)(_ticker / EngineDefaults.TickRate);
         for (; i > 0; i--)
         {
+            var startTick = Stopwatch.GetTimestamp();
             Packet.Reset();
             World.Tick(Packet, true);
             WorldRenderer.ApplyTickChanges(Packet);
             _ticker -= EngineDefaults.TickRate;
+            var timeTookTick = (float)Stopwatch.GetElapsedTime(startTick).TotalMilliseconds;
+            Console.WriteLine($"Tick took {timeTookTick} ms");
         }
         WorldRenderer.Render(_ticker / EngineDefaults.TickRate);
-        GL.Flush();
         SwapBuffers();
-        var timeTook = (float)Stopwatch.GetElapsedTime(start).TotalSeconds;
-        if (timeTook > 0.01f) Console.WriteLine($"Render took {timeTook} seconds");
-        _ticker += timeTook;
+        var timeTook = (float)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+        Console.WriteLine($"Render took {timeTook} ms");
+        _ticker += timeTook / 1000.0f;
     }
 
     private static void HandleError(ErrorCode errorCode, string description)

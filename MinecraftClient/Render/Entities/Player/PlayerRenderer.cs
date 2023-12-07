@@ -30,11 +30,22 @@ public sealed class PlayerRenderer(PlayerState player)
 
     public void RenderSelectionHighlight()
     {
-        var world = MinecraftLibrary.Engine.World.GetInstance();
-        if (world == null || !Player.DidSpawn) return;
+        var world = MinecraftLibrary.Engine.World.Instance;
+        if (!Player.DidSpawn) return;
         var p = world.GetPlayer(Player.EntityId);
         if (p.State.Mode || !p.FoundBlock) return;
-        _selectionHighlightTessellator.SetVertex(world.GetBlockAt(p.HitPosition).Type, world.GetBrightnessAt(p.HitPosition), p.HitPosition);
+        _selectionHighlightTessellator.SetVertex(world.GetBlockAt(p.HitPosition).Type, BuildLightBlock(p.HitPosition), p.HitPosition);
         _selectionHighlightTessellator.Draw();
+    }
+
+    private static byte BuildLightBlock(Vector3i pos)
+    {
+        var world = MinecraftLibrary.Engine.World.Instance;
+        var result = world.GetBrightnessAt(pos + Vector3i.UnitY);
+        result |= (byte)(world.GetBrightnessAt(pos + Vector3i.UnitX) << 2);
+        result |= (byte)(world.GetBrightnessAt(pos - Vector3i.UnitX) << 3);
+        result |= (byte)(world.GetBrightnessAt(pos + Vector3i.UnitZ) << 4);
+        result |= (byte)(world.GetBrightnessAt(pos - Vector3i.UnitZ) << 5);
+        return result;
     }
 }

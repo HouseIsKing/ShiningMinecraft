@@ -1,6 +1,7 @@
 ﻿using System.IO.Compression;
 using MinecraftLibrary.Engine.Blocks;
 using MinecraftLibrary.Engine.Entities;
+using MinecraftLibrary.Engine.States;
 using MinecraftLibrary.Engine.States.Entities;
 using MinecraftLibrary.Engine.States.World;
 using MinecraftLibrary.Network;
@@ -8,9 +9,9 @@ using OpenTK.Mathematics;
 
 namespace MinecraftLibrary.Engine;
 
-public class World
+public sealed class World
 {
-    private static World? _instance;
+    public static World Instance { get; private set; }
     
     public const int WorldWidth = 256;
     public const int WorldHeight = 64;
@@ -21,36 +22,32 @@ public class World
     private readonly List<BlockParticleEntityState> _blockParticlesToSpawn = new();
     private readonly List<ushort> _playersToDespawn = new();
     private readonly List<ushort> _blockParticlesToDespawn = new();
-    public event EngineDefaults.ChunkAddedHandler? OnChunkAdded;
-    public event EngineDefaults.PlayerAddedHandler? OnPlayerAdded;
-    public event EngineDefaults.TickStartHandler? OnTickStart;
-    public event EngineDefaults.TickEndHandler? OnTickEnd;
+    private readonly List<Box3> _blocksCollidingBuffer = new();
+    public event EngineDefaults.ChunkAddedHandler OnChunkAdded;
+    public event EngineDefaults.PlayerAddedHandler OnPlayerAdded;
+    public event EngineDefaults.TickStartHandler OnTickStart;
+    public event EngineDefaults.TickEndHandler OnTickEnd;
     private WorldState State { get; }
-
-    public static World? GetInstance()
-    {
-        return _instance;
-    }
 
     public World(long seed)
     {
-        if (_instance != null) throw new Exception("World already exists");
+        if (Instance != null) throw new Exception("World already exists");
 
         State = new WorldState(seed, WorldWidth, WorldHeight, WorldDepth);
-        _instance = this;
+        Instance = this;
     }
 
     public World()
     {
-        if (_instance != null) throw new Exception("World already exists");
+        if (Instance != null) throw new Exception("World already exists");
 
         State = new WorldState(WorldWidth, WorldHeight, WorldDepth);
-        _instance = this;
+        Instance = this;
     }
 
     ~World()
     {
-        _instance = null;
+        Instance = null;
     }
 
     private void PreTick()
@@ -183,9 +180,9 @@ public class World
 
     public List<Box3> GetBlocksColliding(Box3 collider)
     {
+        _blocksCollidingBuffer.Clear();
         var min = new Vector3i((int)collider.Min.X, (int)collider.Min.Y, (int)collider.Min.Z);
         var max = new Vector3i((int)collider.Max.X + 1, (int)collider.Max.Y + 1, (int)collider.Max.Z + 1);
-        var blocks = new List<Box3>();
         if (collider.Min.X < 0) min.X -= 1;
         if (collider.Min.Y < 0) min.Y -= 1;
         if (collider.Min.Z < 0) min.Z -= 1;
@@ -195,10 +192,10 @@ public class World
         {
             var pos = new Vector3i(x, y, z);
             var block = GetBlockAt(pos);
-            if (block.IsSolid()) blocks.Add(new Box3(pos + block.BlockBounds.Min, pos + block.BlockBounds.Max));
+            if (block.IsSolid()) _blocksCollidingBuffer.Add(new Box3(pos + block.BlockBounds.Min, pos + block.BlockBounds.Max));
         }
 
-        return blocks;
+        return _blocksCollidingBuffer;
     }
     
     public void BreakBlock(Vector3i pos)
@@ -217,9 +214,10 @@ public class World
         RecalculateLight(pos, block);
     }
 
-    private static bool IsOutOfBounds(Vector3i pos)
+    public bool IsOutOfBounds(Vector3i pos)
     {
-        return pos.X < 0 || pos.Y < 0 || pos.Z < 0 || pos.X >= WorldWidth || pos.Y >= WorldHeight ||
+        var baseVector = State.GetBaseVector();
+        return pos.X < baseVector.X || pos.Y < baseVector.Y || pos.Z < baseVector.Z || pos.X >= WorldWidth || pos.Y >= WorldHeight ||
                pos.Z >= WorldDepth;
     }
 
@@ -335,7 +333,12 @@ public class World
     public byte GetBrightnessAt(Vector3i pos)
     {
         if (IsOutOfBounds(pos)) return 0;
-        return (byte)(State.GetLight(pos.Xz) < pos.Y ? 1 : 0);
+        return (byte)(GetLightAt(pos.Xz) < pos.Y ? 1 : 0);
+    }
+
+    public byte GetLightAt(Vector2i pos)
+    {
+        return State.GetLight(pos);
     }
 
     public Random GetWorldRandom()
@@ -362,5 +365,10 @@ public class World
     {
         return WorldWidth / EngineDefaults.ChunkWidth * WorldHeight / EngineDefaults.ChunkHeight *
             WorldDepth / EngineDefaults.ChunkDepth;
+    }
+    
+    public Vector3i GetBaseVector()
+    {
+        return State.GetBaseVector();
     }
 }

@@ -25,8 +25,7 @@ public abstract class Entity<TEntityState> where TEntityState : EntityState<TEnt
         var boundingBox = GetBoundingBox();
         var movementBox = EngineDefaults.Expand(boundingBox, State.Velocity);
         movementBox.HalfSize += Vector3.One;
-        var collidingBoxes = World.GetInstance()?.GetBlocksColliding(movementBox) ??
-                             throw new InvalidOperationException();
+        var collidingBoxes = World.Instance.GetBlocksColliding(movementBox);
         var movementVector = State.Velocity;
         foreach (var collidingBox in collidingBoxes)
             EngineDefaults.ClipCollisionY(boundingBox, collidingBox, ref movementVector.Y);

@@ -70,7 +70,7 @@ public sealed class Player : LivingEntity<PlayerState>
                 HitPosition = right
                     ? new Vector3i((int)position.X, (int)position.Y, (int)position.Z)
                     : new Vector3i((int)position.X - 1, (int)position.Y, (int)position.Z);
-                if (!World.GetInstance()!.GetBlockAt(HitPosition).IsSolid()) continue;
+                if (!World.Instance.GetBlockAt(HitPosition).IsSolid()) continue;
 
                 FoundBlock = true;
                 HitFace = right ? BlockFaces.West : BlockFaces.East;
@@ -86,7 +86,7 @@ public sealed class Player : LivingEntity<PlayerState>
                 HitPosition = up
                     ? new Vector3i((int)position.X, (int)position.Y, (int)position.Z)
                     : new Vector3i((int)position.X, (int)position.Y - 1, (int)position.Z);
-                if (!World.GetInstance()!.GetBlockAt(HitPosition).IsSolid()) continue;
+                if (!World.Instance.GetBlockAt(HitPosition).IsSolid()) continue;
 
                 FoundBlock = true;
                 HitFace = up ? BlockFaces.Bottom : BlockFaces.Top;
@@ -100,7 +100,7 @@ public sealed class Player : LivingEntity<PlayerState>
             HitPosition = forward
                 ? new Vector3i((int)position.X, (int)position.Y, (int)position.Z)
                 : new Vector3i((int)position.X, (int)position.Y, (int)position.Z - 1);
-            if (!World.GetInstance()!.GetBlockAt(HitPosition).IsSolid()) continue;
+            if (!World.Instance.GetBlockAt(HitPosition).IsSolid()) continue;
 
             FoundBlock = true;
             HitFace = forward ? BlockFaces.South : BlockFaces.North;
@@ -136,7 +136,7 @@ public sealed class Player : LivingEntity<PlayerState>
 
         if (blockToPlace.IsSolid() && EngineDefaults.IsIntersecting(GetBoundingBox(), blockBox)) return;
 
-        World.GetInstance()?.SetBlockAt((Vector3i)blockBox.Min, State.CurrentSelectedBlock);
+        World.Instance.SetBlockAt((Vector3i)blockBox.Min, State.CurrentSelectedBlock);
     }
 
     private void ProcessCurrentPlayerInput()
@@ -160,12 +160,12 @@ public sealed class Player : LivingEntity<PlayerState>
             if (State.Mode)
                 PlaceBlock();
             else
-                World.GetInstance()?.BreakBlock(HitPosition);
+                World.Instance.BreakBlock(HitPosition);
         }
 
         if (!input.IsKeyPressed(KeySet.Reset)) return;
 
-        var random = World.GetInstance()?.GetWorldRandom() ?? throw new InvalidOperationException();
+        var random = World.Instance.GetWorldRandom();
         State.Position = new Vector3(random.NextFloat() * 256.0f, 67.0f, random.NextFloat() * 256.0f);
     }
 }

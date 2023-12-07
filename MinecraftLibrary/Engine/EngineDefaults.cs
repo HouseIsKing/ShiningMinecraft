@@ -157,7 +157,7 @@ public static class EngineDefaults
 
     public static ushort GetIndexFromVector(Vector3i indexVector)
     {
-        return (ushort)(indexVector.X * ChunkHeight * ChunkDepth + indexVector.Y * ChunkDepth + indexVector.Z);
+        return (ushort)(indexVector.X % ChunkWidth * ChunkHeight * ChunkDepth + indexVector.Y % ChunkHeight * ChunkDepth + indexVector.Z % ChunkDepth);
     }
 
     public static Vector3i GetVectorFromIndex(ushort index)
