@@ -21,12 +21,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <None Update="Render\Shaders\GUIVertexShader.glsl">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="Render\Shaders\GUIFragmentShader.glsl">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
       <None Update="Render\Shaders\ChunkFS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
@@ -61,6 +55,15 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
       <None Update="Render\Shaders\SelectionHighlightFS.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\SelectionHighlightModeFS.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\SelectionHighlightModeGS.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\SelectionHighlightModeVS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
     </ItemGroup>

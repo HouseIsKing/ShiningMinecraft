@@ -52,11 +52,14 @@ public static class EngineDefaults
         }
     }
     
-    public static long NanoTime() {
-        var nano = 10000L * Stopwatch.GetTimestamp();
-        nano /= TimeSpan.TicksPerMillisecond;
-        nano *= 100L;
-        return nano;
+    public static long NanoTime()
+    {
+        return (long)((double)Stopwatch.GetTimestamp() / Stopwatch.Frequency * 1000000000L);
+    }
+    
+    public static long MilliTime()
+    {
+        return (long)((double)Stopwatch.GetTimestamp() / Stopwatch.Frequency * 1000L);
     }
     
     public static Box3 Expand(Box3 box, Vector3 vector)

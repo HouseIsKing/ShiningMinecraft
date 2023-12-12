@@ -16,6 +16,9 @@ public sealed class ChunkRenderer
     private readonly HashSet<ushort> _dirtyVertexes =
         new(EngineDefaults.ChunkHeight * EngineDefaults.ChunkWidth * EngineDefaults.ChunkDepth);
     private readonly List<uint> _triangles = new();
+    private GlDrawElementsIndirectCommand _command;
+    private byte[] drawCommand = new byte[20];
+    private Box3 _boundingBox;
 
     private Vector3 Position { get; }
     private static Vector3 Rotation => Vector3.Zero;
@@ -27,8 +30,17 @@ public sealed class ChunkRenderer
     {
         ChunkId = id;
         _state = state;
+        _boundingBox = new Box3(_state.ChunkPosition,
+            _state.ChunkPosition + new Vector3i(EngineDefaults.ChunkWidth, EngineDefaults.ChunkHeight,
+                EngineDefaults.ChunkDepth));
         Position = _state.ChunkPosition;
         for (ushort i = 0; i < EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth; i++) _dirtyVertexes.Add(i);
+        _command.instanceCount = 1;
+        _command.baseInstance = 0;
+        _command.baseVertex = (uint)(ChunkId * EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight *
+                                     EngineDefaults.ChunkDepth);
+        _command.count = 0;
+        _command.firstIndex = (uint)(ChunkId * EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth);
     }
 
     public bool IsDirty()
@@ -84,6 +96,7 @@ public sealed class ChunkRenderer
         for (ushort i = 0; i < EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth; i++)
             if (_state.GetBlockAt(i) != BlockType.Air && ShouldDrawCube(i)) 
                 _triangles.Add(i);
+        _command.count = (uint)_triangles.Count;
         tessellator.SetTriangles(ChunkId, _triangles.ToArray());
     }
 
@@ -104,6 +117,7 @@ public sealed class ChunkRenderer
         foreach (var vertex in _dirtyVertexes) tessellator.SetVertex(ChunkId, vertex, _state.GetBlockAt(vertex), BuildLightByte(vertex));
         BuildTriangles(tessellator);
         _dirtyVertexes.Clear();
+        drawCommand = EngineDefaults.GetBytes(_command).ToArray();
     }
 
     public void LightUpdateColumn(Vector2i pos)
@@ -119,5 +133,15 @@ public sealed class ChunkRenderer
     public override int GetHashCode()
     {
         return _state.ChunkPosition.GetHashCode();
+    }
+
+    public byte[] GetDrawCommand()
+    {
+        return drawCommand;
+    }
+
+    public Box3 GetBoundingBox()
+    {
+        return _boundingBox;
     }
 }

@@ -27,8 +27,8 @@ public abstract class BlockRenderer(MinecraftLibrary.Engine.Blocks.Block block)
             var box = blockRender._block.BlockBounds;
             var vertices = new[]
             {
-                box.Min.X, box.Min.Y, box.Min.Z, 1.0F,
-                box.Max.X, box.Max.Y, box.Max.Z, 1.0F,
+                box.Min.X, box.Min.Y, box.Min.Z, 0.0F,
+                box.Max.X, box.Max.Y, box.Max.Z, 0.0F,
             };
             Buffer.BlockCopy(vertices, 0, SsboData, offset, 2 * 16);
             offset += 2 * 16;

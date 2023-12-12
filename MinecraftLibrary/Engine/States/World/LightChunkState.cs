@@ -3,7 +3,7 @@ using OpenTK.Mathematics;
 
 namespace MinecraftLibrary.Engine.States.World;
 
-public class LightChunkState(Vector2i pos) : State<LightChunkState>
+public sealed class LightChunkState(Vector2i pos) : State<LightChunkState>
 {
     public Vector2i LightPosition { get; } = pos;
     public byte LightLevel

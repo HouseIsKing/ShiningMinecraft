@@ -88,4 +88,12 @@ public sealed class ChunkState : State<ChunkState>
     {
         return Blocks[index];
     }
+
+    public override void DiscardChanges()
+    {
+        base.DiscardChanges();
+        _changesCount = 0;
+        for (ushort i = 0; i < _changes.Length; i++)
+            _changes[i].Item1 = false;
+    }
 }

@@ -10,6 +10,7 @@ public class Shader
     
     public static Shader ChunkShader { get; } = new("Render/Shaders/ChunkVS.glsl", "Render/Shaders/ChunkFS.glsl", "Render/Shaders/ChunkGS.glsl");
     public static Shader SelectionHighlightAShader { get; } = new("Render/Shaders/SelectionHighlightVS.glsl", "Render/Shaders/SelectionHighlightFS.glsl", "Render/Shaders/SelectionHighlightGS.glsl");
+    public static Shader SelectionHighlightBShader { get; } = new("Render/Shaders/SelectionHighlightModeVS.glsl", "Render/Shaders/SelectionHighlightModeFS.glsl", "Render/Shaders/SelectionHighlightModeGS.glsl");
 
     private static void CompileShader(int shader)
     {

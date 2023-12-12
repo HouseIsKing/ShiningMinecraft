@@ -5,7 +5,7 @@ namespace MinecraftLibrary.Engine.States;
 
 public abstract class State<TStateType> where TStateType : State<TStateType>
 {
-    public event EngineDefaults.StateChangedHandler? OnChange;
+    public event EngineDefaults.StateChangedHandler OnChange;
     private bool _isDirty;
     public bool IsDirty
     {
@@ -29,4 +29,9 @@ public abstract class State<TStateType> where TStateType : State<TStateType>
         IsDirty = false;
     }
     public abstract void DeserializeChanges(Packet changePacket);
+
+    public virtual void DiscardChanges()
+    {
+        IsDirty = false;
+    }
 }

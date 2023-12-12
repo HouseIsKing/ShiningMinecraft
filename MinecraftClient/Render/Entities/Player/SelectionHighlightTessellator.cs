@@ -6,48 +6,60 @@ using OpenTK.Mathematics;
 
 namespace MinecraftClient.Render.Entities.Player;
 
-public class SelectionHighlightTessellator : Tessellator
+public sealed class SelectionHighlightTessellator : Tessellator
 {
-    private static readonly uint Vao;
     private static readonly byte[] VertexHelper = new byte[4];
-    private IntPtr _vboPointer;
-    private static readonly uint commandBuffer;
+    private readonly IntPtr _vboPointer;
     private Vector3 _position;
-    
-    static SelectionHighlightTessellator()
-    {
-        GlDrawArraysIndirectCommand command = new()
-        {
-            Count = 1,
-            InstanceCount = 1,
-            First = 0,
-            BaseInstance = 0
-        };
-        GL.CreateVertexArrays(1, out Vao);
-        GL.EnableVertexArrayAttrib(Vao, 0);
-        GL.VertexArrayAttribIFormat(Vao, 0, 1, VertexAttribIntegerType.UnsignedInt, 0);
-        GL.VertexArrayAttribBinding(Vao, 0, 0);
-        GL.BindVertexArray(Vao);
-        GL.CreateBuffers(1, out commandBuffer);
-        GL.NamedBufferStorage(commandBuffer, Marshal.SizeOf<GlDrawArraysIndirectCommand>(), ref command, BufferStorageFlags.MapWriteBit | BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapCoherentBit);
-        GL.BindBuffer(BufferTarget.DrawIndirectBuffer, commandBuffer);
-    }
+    public bool Mode { private get; set; }
 
     public SelectionHighlightTessellator()
     {
+        GL.EnableVertexArrayAttrib(Vao, 0);
+        GL.VertexArrayAttribIFormat(Vao, 0, 1, VertexAttribIntegerType.UnsignedInt, 0);
+        GL.VertexArrayAttribBinding(Vao, 0, 0);
+        GlDrawElementsIndirectCommand command = new()
+        {
+            baseInstance = 0,
+            count = 1,
+            instanceCount = 1,
+            firstIndex = 0,
+            baseVertex = 0
+        };
+        GL.NamedBufferStorage(DrawElementsIndirectCommandsBuffer, Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
+            ref command, BufferStorageFlags.None);
+        GL.NamedBufferStorage(Ebo, sizeof(byte), new byte[] { 0 }, BufferStorageFlags.None);
         GL.NamedBufferStorage(Vbo, sizeof(uint), VertexHelper, BufferStorageFlags.MapWriteBit | BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapCoherentBit);
         _vboPointer = GL.MapNamedBufferRange(Vbo, 0, sizeof(uint), BufferAccessMask.MapWriteBit | BufferAccessMask.MapPersistentBit | BufferAccessMask.MapCoherentBit);
         GL.VertexArrayVertexBuffer(Vao, 0, Vbo, IntPtr.Zero, sizeof(uint));
     }
-    public override void Draw()
+    
+    ~SelectionHighlightTessellator()
     {
-        Shader.SelectionHighlightAShader.Use();
-        var alpha = ((float)Math.Sin(DateTime.Now.Millisecond / 100.0) * 0.2f + 0.4f) * 0.5f;
-        Shader.SelectionHighlightAShader.SetFloat("alpha", alpha);
-        Shader.SelectionHighlightAShader.SetVector3("hitPos", _position);
-        GL.BindVertexArray(Vao);
-        GL.BindBuffer(BufferTarget.DrawIndirectBuffer, commandBuffer);
-        GL.DrawArraysIndirect(PrimitiveType.Points, IntPtr.Zero);
+        GL.UnmapNamedBuffer(Vbo);
+    }
+
+    internal override void Draw(ushort commandsCount)
+    {
+        float alpha;
+        if (Mode)
+        {
+            Shader.SelectionHighlightBShader.Use();
+            var bright = (float)(Math.Sin(EngineDefaults.MilliTime() / 100.0) * 0.2) + 0.8F;
+            alpha = (float)(Math.Sin(EngineDefaults.MilliTime() / 200.0) * 0.2) + 0.5F;
+            Shader.SelectionHighlightBShader.SetFloat("alpha", alpha);
+            Shader.SelectionHighlightBShader.SetVector3("hitPos", _position);
+            Shader.SelectionHighlightBShader.SetFloat("bright", bright);
+        }
+        else
+        {
+            Shader.SelectionHighlightAShader.Use();
+            alpha = ((float)(Math.Sin(EngineDefaults.MilliTime() / 100.0) * 0.2) + 0.4f) * 0.5f;
+            Shader.SelectionHighlightAShader.SetFloat("alpha", alpha);
+            Shader.SelectionHighlightAShader.SetVector3("hitPos", _position);
+        }
+        base.Draw(commandsCount);
+        GL.DrawElementsIndirect(PrimitiveType.Points, DrawElementsType.UnsignedByte, IntPtr.Zero);
     }
     
     public void SetVertex(BlockType blockType, byte light, Vector3 position)

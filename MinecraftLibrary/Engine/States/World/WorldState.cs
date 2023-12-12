@@ -12,10 +12,8 @@ public sealed class WorldState : State<WorldState>
     private ushort _dirtyChunksCount;
     private readonly LightChunkState[,] _lights;
     private ushort _dirtyLightsCount;
-    private readonly Dictionary<ushort, PlayerState> _players = new();
-    private ushort _dirtyPlayersCount;
-    private readonly Dictionary<ushort, BlockParticleEntityState> _blockParticles = new();
-    private ushort _dirtyBlockParticlesCount;
+    private readonly Dictionary<ushort, object> _entities = new();
+    private ushort _dirtyEntitiesCount;
     private readonly Dictionary<ushort, EntityType> _entityIdToType = new();
     private readonly HashSet<ushort> _newEntities = new();
     private readonly Dictionary<ushort, KeyValuePair<EntityType, object>> _removedEntities = new();
@@ -60,11 +58,22 @@ public sealed class WorldState : State<WorldState>
         packet.Write(_lights.GetLength(1));
         foreach (var light in _lights) light.Serialize(packet);
     }
-    private void SerializePlayers(Packet packet)
+    private void SerializeEntities(Packet packet)
     {
-        packet.Write(_players.Count);
-        foreach (var player in _players.Values)
-            player.Serialize(packet);
+        packet.Write(_entities.Count);
+        foreach (var entity in _entities)
+            switch (_entityIdToType[entity.Key])
+            {
+                default:
+                    throw new Exception("Invalid Entity Type");
+                case EntityType.Player:
+                    ((PlayerState)entity.Value).Serialize(packet);
+                    break;
+                case EntityType.Zombie:
+                    throw new NotImplementedException();
+                case EntityType.BlockBreakParticle:
+                    throw new NotImplementedException();
+            }
     }
     public override void Serialize(Packet packet)
     {
@@ -72,7 +81,7 @@ public sealed class WorldState : State<WorldState>
         packet.Write(Random.GetSeed());
         SerializeChunks(packet);
         SerializeLights(packet);
-        SerializePlayers(packet);
+        SerializeEntities(packet);
     }
     public override void Deserialize(Packet packet)
     {
@@ -81,7 +90,7 @@ public sealed class WorldState : State<WorldState>
         Random.SetSeed(seed);
         DeserializeChunks(packet);
         DeserializeLights(packet);
-        DeserializePlayers(packet);
+        DeserializeEntities(packet);
     }
     private void DeserializeChunks(Packet packet)
     {
@@ -113,17 +122,29 @@ public sealed class WorldState : State<WorldState>
             _lights[a, b] = light;
         }
     }
-    private void DeserializePlayers(Packet packet)
+    private void DeserializeEntities(Packet packet)
     {
-        packet.Read(out int playerCount);
-        for (var i = 0; i < playerCount; i++)
+        packet.Read(out int entityCount);
+        for (var i = 0; i < entityCount; i++)
         {
-            packet.Read(out ushort playerId);
-            _entityIdToType[playerId] = EntityType.Player;
-            var player = new PlayerState(playerId);
-            player.OnChange += PlayerChanged;
-            player.Deserialize(packet);
-            RegisterPlayer(player);
+            packet.Read(out ushort entityId);
+            packet.Read(out byte entityType);
+            _entityIdToType[entityId] = (EntityType)entityType;
+            switch ((EntityType)entityType)
+            {
+                case EntityType.Player:
+                    var player = new PlayerState(entityId);
+                    player.OnChange += EntityChanged;
+                    player.Deserialize(packet);
+                    RegisterPlayer(player);
+                    break;
+                case EntityType.Zombie:
+                    throw new NotImplementedException();
+                case EntityType.BlockBreakParticle:
+                    throw new NotImplementedException();
+                default:
+                    throw new Exception("Invalid Entity Type");
+            }
         }
     }
     public override void SerializeChangesToChangePacket(Packet changePacket)
@@ -133,8 +154,8 @@ public sealed class WorldState : State<WorldState>
         changePacket.Write(Random.GetSeed());
         SerializeChangesChunks(changePacket);
         SerializeChangesLights(changePacket);
-        SerializeChangesPlayers(changePacket);
-        SerializeChangesEntity(changePacket);
+        SerializeChangesEntities(changePacket);
+        SerializeChangesEntityAddition(changePacket);
     }
     private void SerializeChangesChunks(Packet changePacket)
     {
@@ -166,18 +187,31 @@ public sealed class WorldState : State<WorldState>
 
         _dirtyLightsCount = 0;
     }
-    private void SerializeChangesPlayers(Packet changePacket)
+    private void SerializeChangesEntities(Packet changePacket)
     {
-        changePacket.Write(_dirtyPlayersCount);
-        foreach (var entity in _players.Values.Where(static state => state.IsDirty))
-        {
-            changePacket.Write(entity.EntityId);
-            entity.SerializeChangesToChangePacket(changePacket);
-        }
+        changePacket.Write(_dirtyEntitiesCount);
+        foreach (var entity in _entities)
+            switch (_entityIdToType[entity.Key])
+            {
+                default:
+                    throw new Exception("Invalid Entity Type");
+                case EntityType.Player:
+                    var player = (PlayerState)entity.Value;
+                    if (player.IsDirty)
+                    {
+                        changePacket.Write(player.EntityId);
+                        player.SerializeChangesToChangePacket(changePacket);
+                    }
+                    break;
+                case EntityType.Zombie:
+                    throw new NotImplementedException();
+                case EntityType.BlockBreakParticle:
+                    throw new NotImplementedException();
+            }
 
-        _dirtyPlayersCount = 0;
+        _dirtyEntitiesCount = 0;
     }
-    private void SerializeChangesEntity(Packet changePacket)
+    private void SerializeChangesEntityAddition(Packet changePacket)
     {
         changePacket.Write(_newEntities.Count);
         foreach (var newEntity in _newEntities)
@@ -201,8 +235,8 @@ public sealed class WorldState : State<WorldState>
         revertPacket.Write(_prevRandomSeed);
         SerializeRevertChunks(revertPacket);
         SerializeRevertLights(revertPacket);
-        SerializeRevertPlayers(revertPacket);
-        SerializeRevertEntity(revertPacket);
+        SerializeRevertEntities(revertPacket);
+        SerializeRevertEntityAddition(revertPacket);
     }
     private void SerializeRevertChunks(Packet revertPacket)
     {
@@ -234,18 +268,31 @@ public sealed class WorldState : State<WorldState>
 
         _dirtyLightsCount = 0;
     }
-    private void SerializeRevertPlayers(Packet revertPacket)
+    private void SerializeRevertEntities(Packet revertPacket)
     {
-        revertPacket.Write(_dirtyPlayersCount);
-        foreach (var entity in _players.Values.Where(static state => state.IsDirty))
-        {
-            revertPacket.Write(entity.EntityId);
-            entity.SerializeChangesToRevertPacket(revertPacket);
-        }
+        revertPacket.Write(_dirtyEntitiesCount);
+        foreach (var entity in _entities)
+            switch (_entityIdToType[entity.Key])
+            {
+                default:
+                    throw new Exception("Invalid Entity Type");
+                case EntityType.Player:
+                    var player = (PlayerState)entity.Value;
+                    if (player.IsDirty)
+                    {
+                        revertPacket.Write(player.EntityId);
+                        player.SerializeChangesToRevertPacket(revertPacket);
+                    }
+                    break;
+                case EntityType.Zombie:
+                    throw new NotImplementedException();
+                case EntityType.BlockBreakParticle:
+                    throw new NotImplementedException();
+            }
 
-        _dirtyPlayersCount = 0;
+        _dirtyEntitiesCount = 0;
     }
-    private void SerializeRevertEntity(Packet revertPacket)
+    private void SerializeRevertEntityAddition(Packet revertPacket)
     {
         revertPacket.Write(_newEntities.Count);
         foreach (var newEntity in _newEntities)
@@ -295,13 +342,24 @@ public sealed class WorldState : State<WorldState>
             _lights[a, b].DeserializeChanges(changePacket);
         }
     }
-    private void DeserializeChangesPlayers(Packet changePacket)
+    private void DeserializeChangesEntities(Packet changePacket)
     {
-        changePacket.Read(out ushort playerCount);
-        for (var i = 0; i < playerCount; i++)
+        changePacket.Read(out ushort entityCount);
+        for (var i = 0; i < entityCount; i++)
         {
-            changePacket.Read(out ushort playerId);
-            _players[playerId].DeserializeChanges(changePacket);
+            changePacket.Read(out ushort entityId);
+            switch (_entityIdToType[entityId])
+            {
+                default:
+                    throw new Exception("Invalid Entity Type");
+                case EntityType.Player:
+                    ((PlayerState)_entities[entityId]).DeserializeChanges(changePacket);
+                    break;
+                case EntityType.Zombie:
+                    throw new NotImplementedException();
+                case EntityType.BlockBreakParticle:
+                    throw new NotImplementedException();
+            }
         }
     }
     private void DeserializeChangesEntityLeave(Packet changePacket)
@@ -314,20 +372,8 @@ public sealed class WorldState : State<WorldState>
             switch ((EntityType)entityType)
             {
                 case EntityType.Null:
-                    switch (_entityIdToType[entityId])
-                    {
-                        case EntityType.Null:
-                            throw new ArgumentOutOfRangeException(nameof(entityId), entityId, "Invalid Entity Type");
-                        case EntityType.Player:
-                            UnregisterPlayer(entityId);
-                            _entityIdToType[entityId] = EntityType.Null;
-                            break;
-                        case EntityType.Zombie:
-                            throw new NotImplementedException();
-                        case EntityType.BlockBreakParticle:
-                            throw new NotImplementedException();
-                    }
-
+                    UnregisterEntity(entityId);
+                    _entityIdToType[entityId] = EntityType.Null;
                     break;
                 case EntityType.Player:
                     RegisterPlayer(new PlayerState(entityId));
@@ -350,20 +396,8 @@ public sealed class WorldState : State<WorldState>
             switch ((EntityType)entityType)
             {
                 case EntityType.Null:
-                    switch (_entityIdToType[entityId])
-                    {
-                        case EntityType.Null:
-                            throw new ArgumentOutOfRangeException(nameof(entityId), entityId, "Invalid Entity Type");
-                        case EntityType.Player:
-                            UnregisterPlayer(entityId);
-                            _entityIdToType[entityId] = EntityType.Null;
-                            break;
-                        case EntityType.Zombie:
-                            throw new NotImplementedException();
-                        case EntityType.BlockBreakParticle:
-                            throw new NotImplementedException();
-                    }
-
+                    UnregisterEntity(entityId);
+                    _entityIdToType[entityId] = EntityType.Null;
                     break;
                 case EntityType.Player:
                     RegisterPlayer(new PlayerState(entityId));
@@ -382,9 +416,34 @@ public sealed class WorldState : State<WorldState>
         changePacket.Read(out _prevRandomSeed);
         DeserializeChangesChunks(changePacket);
         DeserializeChangesLights(changePacket);
-        DeserializeChangesPlayers(changePacket);
+        DeserializeChangesEntities(changePacket);
         DeserializeChangesEntityEnter(changePacket);
         DeserializeChangesEntityLeave(changePacket);
+    }
+
+    public override void DiscardChanges()
+    {
+        base.DiscardChanges();
+        _dirtyChunksCount = 0;
+        _dirtyLightsCount = 0;
+        _dirtyEntitiesCount = 0;
+        foreach (var chunk in _chunks) chunk.DiscardChanges();
+        foreach (var light in _lights) light.DiscardChanges();
+        foreach (var entity in _entities)
+            switch (_entityIdToType[entity.Key])
+            {
+                default:
+                    throw new Exception("Invalid Entity Type");
+                case EntityType.Player:
+                    ((PlayerState)entity.Value).DiscardChanges();
+                    break;
+                case EntityType.Zombie:
+                    throw new NotImplementedException();
+                case EntityType.BlockBreakParticle:
+                    throw new NotImplementedException();
+            }
+        _removedEntities.Clear();
+        _newEntities.Clear();
     }
 
     public void AddChunk(Vector3i chunkPosition)
@@ -411,40 +470,29 @@ public sealed class WorldState : State<WorldState>
         return new BlockParticleEntityState(result.Key);
     }
 
-    public void RemovePlayer(ushort entityId)
+    public void RemoveEntity(ushort entityId)
     {
-        _removedEntities.Add(entityId, KeyValuePair.Create(EntityType.Player, (object)_players[entityId]));
-        _entityIdToType[entityId] = EntityType.Null;
-    }
-
-    public void RemoveBlockParticle(ushort entityId)
-    {
-        _removedEntities.Add(entityId, KeyValuePair.Create(EntityType.BlockBreakParticle, (object)_blockParticles[entityId]));
+        _removedEntities.Add(entityId, KeyValuePair.Create(_entityIdToType[entityId], _entities[entityId]));
         _entityIdToType[entityId] = EntityType.Null;
     }
 
     public void RegisterPlayer(PlayerState state)
     {
         state.DidSpawn = true;
-        state.OnChange += PlayerChanged;
-        _players.Add(state.EntityId, state);
+        state.OnChange += EntityChanged;
+        _entities.Add(state.EntityId, state);
     }
 
     public void RegisterBlockParticle(BlockParticleEntityState state)
     {
         state.DidSpawn = true;
-        state.OnChange += BlockParticleChanged;
-        _blockParticles.Add(state.EntityId, state);
+        state.OnChange += EntityChanged;
+        _entities.Add(state.EntityId, state);
     }
 
-    public void UnregisterPlayer(ushort entityId)
+    public void UnregisterEntity(ushort entityId)
     {
-        _players.Remove(entityId);
-    }
-    
-    public void UnregisterBlockParticle(ushort entityId)
-    {
-        _blockParticles.Remove(entityId);
+        _entities.Remove(entityId);
     }
 
     private static bool GetNextEmptyEntityId(KeyValuePair<ushort, EntityType> entity)
@@ -526,15 +574,10 @@ public sealed class WorldState : State<WorldState>
     {
         _dirtyLightsCount++;
     }
-    
-    private void PlayerChanged()
+
+    private void EntityChanged()
     {
-        _dirtyPlayersCount++;
-    }
-    
-    private void BlockParticleChanged()
-    {
-        _dirtyBlockParticlesCount++;
+        _dirtyEntitiesCount++;
     }
     
     public Vector3i GetBaseVector()

@@ -10,43 +10,26 @@ public sealed class ChunkTessellator : Tessellator
 {
     private readonly IntPtr _vboPointer;
     private readonly IntPtr _eboPointer;
-    private readonly uint _drawElementsIndirectCommandsBuffer;
     private readonly IntPtr _drawElementsIndirectCommandsPointer;
     private readonly uint _chunksTransformsBuffer;
     private readonly IntPtr _chunksTransformsPointer;
-    private readonly ushort _chunksCount;
-    private static readonly uint Vao;
     private static readonly byte[] VertexHelper = new byte[4];
     
     private const int VboBufferSize = EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * sizeof(uint);
     private const int EboBufferSize = EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth * sizeof(uint);
 
-    static ChunkTessellator()
-    {
-        GL.CreateVertexArrays(1, out Vao);
-        GL.EnableVertexArrayAttrib(Vao, 0);
-        GL.VertexArrayAttribIFormat(Vao, 0, 1, VertexAttribIntegerType.UnsignedInt, 0);
-        GL.VertexArrayAttribBinding(Vao, 0, 0);
-        GL.BindVertexArray(Vao);
-    }
-
-    public static void Terminate()
-    {
-        GL.DeleteVertexArray(Vao);
-    }
-
     ~ChunkTessellator()
     {
-        GL.UnmapNamedBuffer(_drawElementsIndirectCommandsBuffer);
-        GL.DeleteBuffer(_drawElementsIndirectCommandsBuffer);
+        GL.UnmapNamedBuffer(DrawElementsIndirectCommandsBuffer);
         GL.UnmapNamedBuffer(_chunksTransformsBuffer);
         GL.DeleteBuffer(_chunksTransformsBuffer);
     }
 
     public ChunkTessellator(ushort chunksCount)
     {
-        _chunksCount = chunksCount;
-        
+        GL.EnableVertexArrayAttrib(Vao, 0);
+        GL.VertexArrayAttribIFormat(Vao, 0, 1, VertexAttribIntegerType.UnsignedInt, 0);
+        GL.VertexArrayAttribBinding(Vao, 0, 0);
         GL.CreateBuffers(1, out _chunksTransformsBuffer);
         var helper = chunksCount * Marshal.SizeOf<Matrix4>();
         GL.NamedBufferStorage(_chunksTransformsBuffer,
@@ -56,25 +39,11 @@ public sealed class ChunkTessellator : Tessellator
             BufferAccessMask.MapWriteBit | BufferAccessMask.MapPersistentBit | BufferAccessMask.MapCoherentBit);
         GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4, _chunksTransformsBuffer);
         
-        GL.CreateBuffers(1, out _drawElementsIndirectCommandsBuffer);
         helper = chunksCount * Marshal.SizeOf<GlDrawElementsIndirectCommand>();
-        GL.NamedBufferStorage(_drawElementsIndirectCommandsBuffer,
-            helper, new byte[helper],
+        GL.NamedBufferStorage(DrawElementsIndirectCommandsBuffer, helper, IntPtr.Zero, 
             BufferStorageFlags.MapWriteBit | BufferStorageFlags.MapPersistentBit | BufferStorageFlags.MapCoherentBit);
-        _drawElementsIndirectCommandsPointer = GL.MapNamedBufferRange(_drawElementsIndirectCommandsBuffer, 0, helper,
+        _drawElementsIndirectCommandsPointer = GL.MapNamedBufferRange(DrawElementsIndirectCommandsBuffer, 0, helper,
             BufferAccessMask.MapWriteBit | BufferAccessMask.MapPersistentBit | BufferAccessMask.MapCoherentBit);
-        for (ushort i = 0; i < chunksCount; i++)
-        {
-            GlDrawElementsIndirectCommand command = new()
-            {
-                baseVertex = (uint)i * VboBufferSize / sizeof(uint),
-                firstIndex = (uint)i * EboBufferSize / sizeof(uint),
-                instanceCount = 1
-            };
-            Marshal.Copy(EngineDefaults.GetBytes(command).ToArray(), 0,
-                _drawElementsIndirectCommandsPointer + i * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
-                Marshal.SizeOf<GlDrawElementsIndirectCommand>());
-        }
         
         GL.BindVertexArray(Vao);
         GL.NamedBufferStorage(Vbo, chunksCount * VboBufferSize, IntPtr.Zero,
@@ -90,24 +59,21 @@ public sealed class ChunkTessellator : Tessellator
         GL.VertexArrayElementBuffer(Vao, Ebo);
     }
 
-    public void SetTriangles(ushort chunkId, uint[] triangles)
+    internal void SetTriangles(ushort chunkId, uint[] triangles)
     {
         var offset = chunkId * EboBufferSize;
-        Marshal.Copy(BitConverter.GetBytes(triangles.Length), 0,
-            _drawElementsIndirectCommandsPointer + chunkId * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
-            sizeof(uint));
         Marshal.Copy((int[])(object)triangles, 0, _eboPointer + offset, triangles.Length);
     }
 
-    public override void Draw()
+    internal override void Draw(ushort commandsCount)
     {
         Shader.ChunkShader.Use();
-        GL.BindBuffer(BufferTarget.DrawIndirectBuffer, _drawElementsIndirectCommandsBuffer);
+        GL.BindBuffer(BufferTarget.DrawIndirectBuffer, DrawElementsIndirectCommandsBuffer);
         GL.BindVertexArray(Vao);
-        GL.MultiDrawElementsIndirect(PrimitiveType.Points, DrawElementsType.UnsignedInt, IntPtr.Zero, _chunksCount, Marshal.SizeOf<GlDrawElementsIndirectCommand>());
+        GL.MultiDrawElementsIndirect(PrimitiveType.Points, DrawElementsType.UnsignedInt, IntPtr.Zero, commandsCount, Marshal.SizeOf<GlDrawElementsIndirectCommand>());
     }
 
-    public void SetVertex(ushort chunkId, ushort index, BlockType blockType, byte light)
+    internal void SetVertex(ushort chunkId, ushort index, BlockType blockType, byte light)
     {
         var finalIndex = chunkId * VboBufferSize + index * sizeof(uint);
         var constructedVertex = (uint)blockType << 16;
@@ -122,5 +88,10 @@ public sealed class ChunkTessellator : Tessellator
     public void SetChunkTransform(ushort chunkId, Matrix4 transform)
     {
         Marshal.Copy(EngineDefaults.GetBytes(transform).ToArray(), 0, _chunksTransformsPointer + chunkId * Marshal.SizeOf<Matrix4>(), Marshal.SizeOf<Matrix4>());
+    }
+    
+    public IntPtr GetDrawCommandPointer()
+    {
+        return _drawElementsIndirectCommandsPointer;
     }
 }

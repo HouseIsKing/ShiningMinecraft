@@ -9,7 +9,7 @@ out uint chunkIndex;
 void main()
 {
     BlockType16_Brightness6a = BlockType16_Brightness6;
-    chunkIndex = gl_DrawID;
+    chunkIndex = gl_VertexID / (chunkWidth * chunkDepth * chunkHeight);
     uint indexInChunk = gl_VertexID % (chunkWidth * chunkDepth * chunkHeight);
     gl_Position = vec4((indexInChunk / chunkHeight) / chunkDepth, (indexInChunk / chunkDepth) % chunkHeight, indexInChunk % chunkDepth, 1.0f);
 }

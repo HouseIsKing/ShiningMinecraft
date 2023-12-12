@@ -109,26 +109,53 @@ public sealed class WorldRenderer
 
     public void Render(float delta)
     {
-        _playerRenderer.UpdateRenderer(delta);
+        _playerRenderer.UpdateCamera(delta);
         var camera = Camera.GetInstance();
-        var cameraFrustum = camera.GetFrustum();
-        Marshal.Copy(EngineDefaults.GetBytes(camera.GetViewMatrix()).ToArray(), 0, _cameraInfoPointer, Marshal.SizeOf<Matrix4>());
-        Marshal.Copy(EngineDefaults.GetBytes(camera.GetProjectionMatrix()).ToArray(), 0, _cameraInfoPointer + Marshal.SizeOf<Matrix4>(), Marshal.SizeOf<Matrix4>());
+        Marshal.Copy(EngineDefaults.GetBytes(camera.GetViewMatrix()).ToArray(), 0, _cameraInfoPointer,
+            Marshal.SizeOf<Matrix4>());
+        Marshal.Copy(EngineDefaults.GetBytes(camera.GetProjectionMatrix()).ToArray(), 0,
+            _cameraInfoPointer + Marshal.SizeOf<Matrix4>(), Marshal.SizeOf<Matrix4>());
         var world = MinecraftLibrary.Engine.World.Instance;
         Marshal.Copy(EngineDefaults.GetBytes((uint)world.GetWorldTime()).ToArray(), 0, _worldInfoPointer, sizeof(uint));
-        var dirtyChunksEnumerator = _chunkRenderers.GetEnumerator();
-        for (var i = 0; i < 8 && dirtyChunksEnumerator.MoveNext();)
-        {
-            var chunkRenderer = (ChunkRenderer)dirtyChunksEnumerator.Current;
-            if (chunkRenderer == null || !chunkRenderer.IsDirty()) continue;
-            chunkRenderer.UpdateRenderer(_chunkTessellator);
-            i++;
-        }
-
-        _chunkTessellator.Draw();
+        UpdateDirtyChunks();
+        RenderChunks();
         GL.Enable(EnableCap.Blend);
         _playerRenderer.RenderSelectionHighlight();
         GL.Disable(EnableCap.Blend);
+    }
+
+    private void UpdateDirtyChunks()
+    {
+        byte counter = 0;
+        for (var i = 0; i < _chunkRenderers.GetLength(0); i++)
+        for (var j = 0; j < _chunkRenderers.GetLength(1); j++)
+        for (var k = 0; k < _chunkRenderers.GetLength(2); k++)
+        {
+            var chunkRenderer = _chunkRenderers[i, j, k];
+            if (!chunkRenderer.IsDirty()) continue;
+            chunkRenderer.UpdateRenderer(_chunkTessellator);
+            if (++counter == 8) return;
+        }
+    }
+
+    private void RenderChunks()
+    {
+        var camera = Camera.GetInstance();
+        ushort counter = 0;
+        var cameraFrustum = camera.GetFrustum();
+        var pointer = _chunkTessellator.GetDrawCommandPointer();
+        for (var i = 0; i < _chunkRenderers.GetLength(0); i++)
+        for (var j = 0; j < _chunkRenderers.GetLength(1); j++)
+        for (var k = 0; k < _chunkRenderers.GetLength(2); k++)
+        {
+            var chunkRenderer = _chunkRenderers[i, j, k];
+            if (!cameraFrustum.CubeInFrustum(chunkRenderer.GetBoundingBox())) continue;
+            Marshal.Copy(chunkRenderer.GetDrawCommand(), 0,
+                pointer + counter * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
+                Marshal.SizeOf<GlDrawElementsIndirectCommand>());
+            counter++;
+        }
+        _chunkTessellator.Draw(counter);
     }
 
     private void ApplyTickChunksChanges(Packet changePacket)

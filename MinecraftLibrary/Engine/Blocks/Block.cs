@@ -43,6 +43,7 @@ public class Block
 
     public virtual void OnBreak(World world, Vector3i pos)
     {
+        /*
         for (var i = 0; i < 4; i++)
         for (var j = 0; j < 4; j++)
         for (var k = 0; k < 4; k++)
@@ -59,5 +60,6 @@ public class Block
             particle.Scale = EngineDefaults.ParticleSize * (random.NextFloat() * 0.5f + 0.5f);
             particle.MaxLifeTime = (byte)(4.0f / random.NextFloat() * 0.9f + 0.1f);
         }
+        */
     }
 }

@@ -227,4 +227,11 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
                 throw new ArgumentOutOfRangeException(nameof(change), change, "Invalid Entity State Change");
         }
     }
+
+    public override void DiscardChanges()
+    {
+        base.DiscardChanges();
+        _changesCount = 0;
+        for (byte i = 0; i < _changes.Length; i++) _changes[i].Item1 = false;
+    }
 }

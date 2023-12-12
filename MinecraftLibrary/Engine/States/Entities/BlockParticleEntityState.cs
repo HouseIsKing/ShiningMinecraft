@@ -170,4 +170,11 @@ public sealed class BlockParticleEntityState : EntityState<BlockParticleEntitySt
                 break;
         }
     }
+
+    public override void DiscardChanges()
+    {
+        base.DiscardChanges();
+        _changesCount = 0;
+        for (byte i = 0; i < _changes.Length; i++) _changes[i].Item1 = false;
+    }
 }

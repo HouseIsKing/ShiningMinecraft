@@ -1,7 +1,6 @@
 ﻿using System.IO.Compression;
 using MinecraftLibrary.Engine.Blocks;
 using MinecraftLibrary.Engine.Entities;
-using MinecraftLibrary.Engine.States;
 using MinecraftLibrary.Engine.States.Entities;
 using MinecraftLibrary.Engine.States.World;
 using MinecraftLibrary.Network;
@@ -107,13 +106,13 @@ public sealed class World
     {
         foreach (var id in _playersToDespawn)
         {
-            State.UnregisterPlayer(id);
+            State.UnregisterEntity(id);
             _players.Remove(id);
         }
 
         foreach (var id in _blockParticlesToDespawn)
         {
-            State.UnregisterBlockParticle(id);
+            State.UnregisterEntity(id);
             _blockParticles.Remove(id);
         }
 
@@ -158,13 +157,13 @@ public sealed class World
 
     public void DespawnPlayer(ushort id)
     {
-        State.RemovePlayer(id);
+        State.RemoveEntity(id);
         _playersToDespawn.Add(id);
     }
 
     public void DespawnBlockParticleEntity(ushort id)
     {
-        State.RemoveBlockParticle(id);
+        State.RemoveEntity(id);
         _blockParticlesToDespawn.Add(id);
     }
 
@@ -309,7 +308,7 @@ public sealed class World
                 }
             }
         }
-        State.SerializeChangesToChangePacket(new Packet(new PacketHeader()));
+        State.DiscardChanges();
     }
     
     private void RecalculateLight(Vector3i blockPlaced, BlockType type)
