@@ -7,7 +7,7 @@ namespace MinecraftLibrary.Engine.States.World;
 
 public sealed class WorldState : State<WorldState>
 {
-    private Vector3i _baseVector;
+    internal Vector3i BaseVector { get; set; } = Vector3i.Zero;
     private readonly ChunkState[,,] _chunks;
     private ushort _dirtyChunksCount;
     private readonly LightChunkState[,] _lights;
@@ -17,16 +17,34 @@ public sealed class WorldState : State<WorldState>
     private readonly Dictionary<ushort, EntityType> _entityIdToType = new();
     private readonly HashSet<ushort> _newEntities = new();
     private readonly Dictionary<ushort, KeyValuePair<EntityType, object>> _removedEntities = new();
+    public event EngineDefaults.EntityAddedHandler EntityAdded;
+    public event EngineDefaults.EntityRemovedHandler EntityRemoved;
+    
     internal Random Random { get; }
-    public ulong WorldTime;
+    internal ulong WorldTime;
     private long _prevRandomSeed;
 
     public long Seed { get; }
 
-    public WorldState(long seed, ushort maxX, ushort maxY, ushort maxZ)
+    internal WorldState(long seed, ushort maxX, ushort maxY, ushort maxZ)
     {
         _chunks = new ChunkState[maxX / EngineDefaults.ChunkWidth, maxY / EngineDefaults.ChunkHeight, maxZ / EngineDefaults.ChunkDepth];
+        for (var i = 0; i < _chunks.GetLength(0); i++)
+        for (var j = 0; j < _chunks.GetLength(1); j++)
+        for (var k = 0; k < _chunks.GetLength(2); k++)
+        {
+            var chunk = new ChunkState((byte)i, (byte)j, (byte)k);
+            chunk.OnChange += ChunkChanged;
+            _chunks[i, j, k] = chunk;
+        }
         _lights = new LightChunkState[maxX, maxZ];
+        for (var i = 0; i < _lights.GetLength(0); i++)
+        for (var j = 0; j < _lights.GetLength(1); j++)
+        {
+            var light = new LightChunkState((ushort)i, (ushort)j);
+            light.OnChange += LightChanged;
+            _lights[i, j] = light;
+        }
         Seed = seed;
         Random = new Random(seed);
         _entityIdToType.EnsureCapacity(ushort.MaxValue);
@@ -34,15 +52,8 @@ public sealed class WorldState : State<WorldState>
         _entityIdToType.Add(0, EntityType.Null);
     }
 
-    public WorldState(ushort maxX, ushort maxY, ushort maxZ)
+    internal WorldState(ushort maxX, ushort maxY, ushort maxZ) : this(new Random().GetSeed(), maxX, maxY, maxZ)
     {
-        _chunks = new ChunkState[maxX / EngineDefaults.ChunkWidth, maxY / EngineDefaults.ChunkHeight, maxZ / EngineDefaults.ChunkDepth];
-        _lights = new LightChunkState[maxX, maxZ];
-        Seed = -1;
-        Random = new Random();
-        _entityIdToType.EnsureCapacity(ushort.MaxValue);
-        for (var i = ushort.MaxValue; i > 0; i--) _entityIdToType.Add(i, EntityType.Null);
-        _entityIdToType.Add(0, EntityType.Null);
     }
 
     private void SerializeChunks(Packet packet)
@@ -101,11 +112,10 @@ public sealed class WorldState : State<WorldState>
         for (var b = 0; b < j; b++)
         for (var c = 0; c < k; c++)
         {
-            packet.Read(out Vector3i chunkPosition);
-            var chunk = new ChunkState(chunkPosition);
-            chunk.OnChange += ChunkChanged;
-            chunk.Deserialize(packet);
-            _chunks[a, b, c] = chunk;
+            packet.Read(out byte x);
+            packet.Read(out byte y);
+            packet.Read(out byte z);
+            _chunks[x, y, z].Deserialize(packet);
         }
     }
     private void DeserializeLights(Packet packet)
@@ -115,11 +125,9 @@ public sealed class WorldState : State<WorldState>
         for (var a = 0; a < i; a++)
         for (var b = 0; b < j; b++)
         {
-            packet.Read(out Vector2i lightPosition);
-            var light = new LightChunkState(lightPosition);
-            light.OnChange += LightChanged;
-            light.Deserialize(packet);
-            _lights[a, b] = light;
+            packet.Read(out ushort x);
+            packet.Read(out ushort z);
+            _lights[x, z].Deserialize(packet);
         }
     }
     private void DeserializeEntities(Packet packet)
@@ -134,7 +142,6 @@ public sealed class WorldState : State<WorldState>
             {
                 case EntityType.Player:
                     var player = new PlayerState(entityId);
-                    player.OnChange += EntityChanged;
                     player.Deserialize(packet);
                     RegisterPlayer(player);
                     break;
@@ -145,6 +152,7 @@ public sealed class WorldState : State<WorldState>
                 default:
                     throw new Exception("Invalid Entity Type");
             }
+            EntityAdded?.Invoke(entityId);
         }
     }
     public override void SerializeChangesToChangePacket(Packet changePacket)
@@ -163,14 +171,7 @@ public sealed class WorldState : State<WorldState>
         for (byte i = 0; i < _chunks.GetLength(0); i++)
         for (byte j = 0; j < _chunks.GetLength(1); j++)
         for (byte k = 0; k < _chunks.GetLength(2); k++)
-            if (_chunks[i, j, k].IsDirty)
-            {
-                changePacket.Write(i);
-                changePacket.Write(j);
-                changePacket.Write(k);
-                _chunks[i, j, k].SerializeChangesToChangePacket(changePacket);
-            }
-
+            _chunks[i, j, k].SerializeChangesToChangePacket(changePacket);
         _dirtyChunksCount = 0;
     }
     private void SerializeChangesLights(Packet changePacket)
@@ -178,13 +179,7 @@ public sealed class WorldState : State<WorldState>
         changePacket.Write(_dirtyLightsCount);
         for (ushort i = 0; i < _lights.GetLength(0); i++)
         for (ushort j = 0; j < _lights.GetLength(1); j++)
-            if (_lights[i, j].IsDirty)
-            {
-                changePacket.Write(i);
-                changePacket.Write(j);
-                _lights[i, j].SerializeChangesToChangePacket(changePacket);
-            }
-
+            _lights[i, j].SerializeChangesToChangePacket(changePacket);
         _dirtyLightsCount = 0;
     }
     private void SerializeChangesEntities(Packet changePacket)
@@ -196,12 +191,7 @@ public sealed class WorldState : State<WorldState>
                 default:
                     throw new Exception("Invalid Entity Type");
                 case EntityType.Player:
-                    var player = (PlayerState)entity.Value;
-                    if (player.IsDirty)
-                    {
-                        changePacket.Write(player.EntityId);
-                        player.SerializeChangesToChangePacket(changePacket);
-                    }
+                    ((PlayerState)entity.Value).SerializeChangesToChangePacket(changePacket);
                     break;
                 case EntityType.Zombie:
                     throw new NotImplementedException();
@@ -243,15 +233,8 @@ public sealed class WorldState : State<WorldState>
         revertPacket.Write(_dirtyChunksCount);
         for (byte i = 0; i < _chunks.GetLength(0); i++)
         for (byte j = 0; j < _chunks.GetLength(1); j++)
-        for (byte k = 0; k < _chunks.GetLength(2); k++)
-            if (_chunks[i, j, k].IsDirty)
-            {
-                revertPacket.Write(i);
-                revertPacket.Write(j);
-                revertPacket.Write(k);
-                _chunks[i, j, k].SerializeChangesToRevertPacket(revertPacket);
-            }
-
+        for (byte k = 0; k < _chunks.GetLength(2); k++) 
+            _chunks[i, j, k].SerializeChangesToRevertPacket(revertPacket);
         _dirtyChunksCount = 0;
     }
     private void SerializeRevertLights(Packet revertPacket)
@@ -259,12 +242,7 @@ public sealed class WorldState : State<WorldState>
         revertPacket.Write(_dirtyLightsCount);
         for (ushort i = 0; i < _lights.GetLength(0); i++)
         for (ushort j = 0; j < _lights.GetLength(1); j++)
-            if (_lights[i, j].IsDirty)
-            {
-                revertPacket.Write(i);
-                revertPacket.Write(j);
-                _lights[i, j].SerializeChangesToRevertPacket(revertPacket);
-            }
+            _lights[i, j].SerializeChangesToRevertPacket(revertPacket);
 
         _dirtyLightsCount = 0;
     }
@@ -277,12 +255,7 @@ public sealed class WorldState : State<WorldState>
                 default:
                     throw new Exception("Invalid Entity Type");
                 case EntityType.Player:
-                    var player = (PlayerState)entity.Value;
-                    if (player.IsDirty)
-                    {
-                        revertPacket.Write(player.EntityId);
-                        player.SerializeChangesToRevertPacket(revertPacket);
-                    }
+                    ((PlayerState)entity.Value).SerializeChangesToRevertPacket(revertPacket);
                     break;
                 case EntityType.Zombie:
                     throw new NotImplementedException();
@@ -372,9 +345,10 @@ public sealed class WorldState : State<WorldState>
             switch ((EntityType)entityType)
             {
                 case EntityType.Null:
+                    EntityRemoved?.Invoke(entityId);
                     UnregisterEntity(entityId);
                     _entityIdToType[entityId] = EntityType.Null;
-                    break;
+                    continue;
                 case EntityType.Player:
                     RegisterPlayer(new PlayerState(entityId));
                     _entityIdToType[entityId] = EntityType.Player;
@@ -384,6 +358,7 @@ public sealed class WorldState : State<WorldState>
                 case EntityType.BlockBreakParticle:
                     throw new NotImplementedException();
             }
+            EntityAdded?.Invoke(entityId);
         }
     }
     private void DeserializeChangesEntityEnter(Packet changePacket)
@@ -396,9 +371,10 @@ public sealed class WorldState : State<WorldState>
             switch ((EntityType)entityType)
             {
                 case EntityType.Null:
+                    EntityRemoved?.Invoke(entityId);
                     UnregisterEntity(entityId);
                     _entityIdToType[entityId] = EntityType.Null;
-                    break;
+                    continue;
                 case EntityType.Player:
                     RegisterPlayer(new PlayerState(entityId));
                     _entityIdToType[entityId] = EntityType.Player;
@@ -408,6 +384,7 @@ public sealed class WorldState : State<WorldState>
                 case EntityType.BlockBreakParticle:
                     throw new NotImplementedException();
             }
+            EntityAdded?.Invoke(entityId);
         }
     }
     public override void DeserializeChanges(Packet changePacket)
@@ -446,15 +423,7 @@ public sealed class WorldState : State<WorldState>
         _newEntities.Clear();
     }
 
-    public void AddChunk(Vector3i chunkPosition)
-    {
-        ChunkState chunk = new(chunkPosition);
-        chunk.OnChange += ChunkChanged;
-        var pos = chunkPosition - _baseVector;
-        _chunks[pos.X / EngineDefaults.ChunkWidth, pos.Y / EngineDefaults.ChunkHeight, pos.Z / EngineDefaults.ChunkDepth] = chunk;
-    }
-
-    public PlayerState AddPlayer()
+    internal PlayerState AddPlayer()
     {
         var result = _entityIdToType.First(GetNextEmptyEntityId);
         _entityIdToType[result.Key] = EntityType.Player;
@@ -462,7 +431,7 @@ public sealed class WorldState : State<WorldState>
         return new PlayerState(result.Key);
     }
 
-    public BlockParticleEntityState AddBlockParticleEntity()
+    internal BlockParticleEntityState AddBlockParticleEntity()
     {
         var result = _entityIdToType.First(GetNextEmptyEntityId);
         _entityIdToType[result.Key] = EntityType.BlockBreakParticle;
@@ -470,27 +439,27 @@ public sealed class WorldState : State<WorldState>
         return new BlockParticleEntityState(result.Key);
     }
 
-    public void RemoveEntity(ushort entityId)
+    internal void RemoveEntity(ushort entityId)
     {
         _removedEntities.Add(entityId, KeyValuePair.Create(_entityIdToType[entityId], _entities[entityId]));
         _entityIdToType[entityId] = EntityType.Null;
     }
 
-    public void RegisterPlayer(PlayerState state)
+    internal void RegisterPlayer(PlayerState state)
     {
         state.DidSpawn = true;
         state.OnChange += EntityChanged;
         _entities.Add(state.EntityId, state);
     }
 
-    public void RegisterBlockParticle(BlockParticleEntityState state)
+    internal void RegisterBlockParticle(BlockParticleEntityState state)
     {
         state.DidSpawn = true;
         state.OnChange += EntityChanged;
         _entities.Add(state.EntityId, state);
     }
 
-    public void UnregisterEntity(ushort entityId)
+    internal void UnregisterEntity(ushort entityId)
     {
         _entities.Remove(entityId);
     }
@@ -500,31 +469,24 @@ public sealed class WorldState : State<WorldState>
         return entity.Value == EntityType.Null;
     }
 
-    public void AddLight(Vector2i lightPos)
+    internal void SetLight(Vector2i lightPos, byte newValue)
     {
-        var pos = lightPos - _baseVector.Xz;
-        _lights[pos.X, pos.Y] = new LightChunkState(lightPos);
-        _lights[pos.X, pos.Y].OnChange += LightChanged;
-    }
-
-    public void SetLight(Vector2i lightPos, byte newValue)
-    {
-        var pos = lightPos - _baseVector.Xz;
+        var pos = lightPos - BaseVector.Xz;
         _lights[pos.X, pos.Y].LightLevel = newValue;
     }
 
-    public EntityType GetEntityType(ushort entityId)
+    internal EntityType GetEntityType(ushort entityId)
     {
         return _entityIdToType[entityId];
     }
 
-    public ChunkState GetChunkAt(Vector3i chunkPosition)
+    internal ChunkState GetChunkAt(Vector3i chunkPosition)
     {
-        var pos = chunkPosition - _baseVector;
+        var pos = chunkPosition - BaseVector;
         return _chunks[pos.X / EngineDefaults.ChunkWidth, pos.Y / EngineDefaults.ChunkHeight, pos.Z / EngineDefaults.ChunkDepth];
     }
 
-    public void SaveWorld(GZipStream stream)
+    internal void SaveWorld(GZipStream stream)
     {
         stream.Write(BitConverter.GetBytes(_chunks.GetLength(0)));
         stream.Write(BitConverter.GetBytes(_chunks.GetLength(1)));
@@ -534,7 +496,7 @@ public sealed class WorldState : State<WorldState>
         stream.Write(packet.ReadAll());
     }
 
-    public void LoadWorld(GZipStream stream)
+    internal void LoadWorld(GZipStream stream)
     {
         var packet = new Packet(new PacketHeader(PacketType.LoadWorld));
         var b = stream.ReadByte();
@@ -551,17 +513,16 @@ public sealed class WorldState : State<WorldState>
         for (b = 0; b < j; b++)
         for (var c = 0; c < k; c++)
         {
-            packet.Read(out Vector3i chunkPosition);
-            var chunk = new ChunkState(chunkPosition);
-            chunk.OnChange += ChunkChanged;
-            chunk.Deserialize(packet);
-            _chunks[a, b, c] = chunk;
+            packet.Read(out byte x);
+            packet.Read(out byte y);
+            packet.Read(out byte z);
+            _chunks[x, y, z].Deserialize(packet);
         }
     }
 
-    public byte GetLight(Vector2i pos)
+    internal byte GetLight(Vector2i pos)
     {
-        var finalPos = pos - _baseVector.Xz;
+        var finalPos = pos - BaseVector.Xz;
         return _lights[finalPos.X, finalPos.Y].LightLevel;
     }
 
@@ -579,9 +540,14 @@ public sealed class WorldState : State<WorldState>
     {
         _dirtyEntitiesCount++;
     }
-    
-    public Vector3i GetBaseVector()
+
+    internal ChunkState[,,] GetChunks()
     {
-        return _baseVector;
+        return _chunks;
+    }
+
+    internal T GetEntity<T>(ushort entityId) where T : class
+    {
+        return _entities[entityId] as T;
     }
 }

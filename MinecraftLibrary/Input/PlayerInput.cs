@@ -110,6 +110,8 @@ public class PlayerInput
     {
         packet.Write(MouseX);
         packet.Write(MouseY);
+        packet.Write(KeySet1Hold);
+        packet.Write(KeySet2Hold);
         packet.Write(KeySet1Pressed);
         packet.Write(KeySet2Pressed);
     }
@@ -118,6 +120,8 @@ public class PlayerInput
     {
         packet.Read(out MouseX);
         packet.Read(out MouseY);
+        packet.Read(out KeySet1Hold);
+        packet.Read(out KeySet2Hold);
         packet.Read(out KeySet1Pressed);
         packet.Read(out KeySet2Pressed);
     }

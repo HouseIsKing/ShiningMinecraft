@@ -5,20 +5,26 @@ namespace MinecraftLibrary.Engine.States.World;
 
 public sealed class ChunkState : State<ChunkState>
 {
-    public Vector3i ChunkPosition { get; }
+    public byte X { get; }
+    public byte Y { get; }
+    public byte Z { get; }
     private BlockType[] Blocks { get; } = new BlockType[EngineDefaults.ChunkHeight * EngineDefaults.ChunkWidth * EngineDefaults.ChunkDepth];
     private readonly (bool, BlockType)[] _changes = new (bool, BlockType)[EngineDefaults.ChunkHeight * EngineDefaults.ChunkWidth * EngineDefaults.ChunkDepth];
     private ushort _changesCount;
 
-    public ChunkState(Vector3i pos)
+    public ChunkState(byte x, byte y, byte z)
     {
-        ChunkPosition = pos;
+        X = x;
+        Y = y;
+        Z = z;
         for (var i = 0; i < _changes.Length; i++) _changes[i] = (false, BlockType.Air);
     }
 
     public override void Serialize(Packet packet)
     {
-        packet.Write(ChunkPosition);
+        packet.Write(X);
+        packet.Write(Y);
+        packet.Write(Z);
         foreach (var block in Blocks) packet.Write((byte)block);
     }
 
@@ -33,7 +39,11 @@ public sealed class ChunkState : State<ChunkState>
 
     public override void SerializeChangesToChangePacket(Packet changePacket)
     {
+        if (!IsDirty) return;
         base.SerializeChangesToChangePacket(changePacket);
+        changePacket.Write(X);
+        changePacket.Write(Y);
+        changePacket.Write(Z);
         changePacket.Write(_changesCount);
         for (ushort i = 0; i < _changes.Length; i++)
             if (_changes[i].Item1)
@@ -47,7 +57,11 @@ public sealed class ChunkState : State<ChunkState>
 
     public override void SerializeChangesToRevertPacket(Packet revertPacket)
     {
+        if (!IsDirty) return;
         base.SerializeChangesToRevertPacket(revertPacket);
+        revertPacket.Write(X);
+        revertPacket.Write(Y);
+        revertPacket.Write(Z);
         revertPacket.Write(_changesCount);
         for (ushort i = 0; i < _changes.Length; i++)
             if (_changes[i].Item1)
@@ -67,7 +81,7 @@ public sealed class ChunkState : State<ChunkState>
         {
             changePacket.Read(out ushort index);
             changePacket.Read(out byte blockType);
-            Blocks[index] = (BlockType)blockType;
+            SetBlockAt(index, (BlockType)blockType);
         }
     }
 

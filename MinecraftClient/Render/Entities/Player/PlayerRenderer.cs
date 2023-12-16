@@ -8,10 +8,9 @@ namespace MinecraftClient.Render.Entities.Player;
 
 public sealed class PlayerRenderer(PlayerState player)
 {
-    private PlayerState Player { get; } = player;
+    public PlayerState Player { private get; set; } = player;
     private PlayerState OldPlayerState { get; } = new(0);
     private readonly SelectionHighlightTessellator _selectionHighlightTessellator = new();
-
     public void UpdateCamera(float delta)
     {
         Camera.GetInstance().Position = OldPlayerState.Position + (Player.Position - OldPlayerState.Position) * delta + Vector3.UnitY * (EngineDefaults.CameraOffset - EngineDefaults.PlayerSize.Y);

@@ -4,6 +4,7 @@ using MinecraftClient.Render.Shaders;
 using MinecraftClient.Render.Textures;
 using MinecraftClient.Render.World.Block;
 using MinecraftLibrary.Engine;
+using MinecraftLibrary.Engine.States.Entities;
 using MinecraftLibrary.Engine.States.World;
 using MinecraftLibrary.Network;
 using OpenTK.Graphics.OpenGL4;
@@ -20,11 +21,12 @@ public sealed class WorldRenderer
     private IntPtr _cameraInfoPointer;
     private readonly ChunkRenderer[,,] _chunkRenderers = new ChunkRenderer[MinecraftLibrary.Engine.World.WorldWidth / EngineDefaults.ChunkWidth, MinecraftLibrary.Engine.World.WorldHeight / EngineDefaults.ChunkHeight, MinecraftLibrary.Engine.World.WorldDepth / EngineDefaults.ChunkDepth];
     private readonly ChunkTessellator _chunkTessellator;
-    private readonly PlayerRenderer _playerRenderer;
+    public PlayerRenderer PlayerRenderer { get; }
+    private Dictionary<ushort, OtherPlayerRenderer> OtherPlayers { get; } = new();
     public const int RenderWidth = MinecraftLibrary.Engine.World.WorldWidth;
     public const int RenderHeight = MinecraftLibrary.Engine.World.WorldHeight;
     public const int RenderDepth = MinecraftLibrary.Engine.World.WorldDepth;
-    private Vector3i baseVector = MinecraftLibrary.Engine.World.Instance.GetBaseVector();
+    public Vector3i BaseVector { get; } = MinecraftLibrary.Engine.World.Instance.GetBaseVector();
     public static WorldRenderer Instance { get; private set; }
     
     private void InitFog()
@@ -71,10 +73,18 @@ public sealed class WorldRenderer
     {
         if (Instance != null) throw new Exception("WorldRenderer already initialized");
         Instance = this;
-        _playerRenderer = playerRenderer;
+        PlayerRenderer = playerRenderer;
         var world = MinecraftLibrary.Engine.World.Instance;
         _chunkTessellator = new ChunkTessellator(MinecraftLibrary.Engine.World.GetMaxChunksCount());
-        world.OnChunkAdded += OnChunkAdded;
+        for (var i = 0; i < _chunkRenderers.GetLength(0); i++)
+        for (var j = 0; j < _chunkRenderers.GetLength(1); j++)
+        for (var k = 0; k < _chunkRenderers.GetLength(2); k++)
+        {
+            var state = world.GetChunkAt(new Vector3i(i * EngineDefaults.ChunkWidth, j * EngineDefaults.ChunkHeight, k * EngineDefaults.ChunkDepth));
+            _chunkRenderers[i, j, k] = new ChunkRenderer(state, (ushort)(i * _chunkRenderers.GetLength(2) * _chunkRenderers.GetLength(1) + j * _chunkRenderers.GetLength(2) + k));
+            _chunkTessellator.SetChunkTransform(_chunkRenderers[i, j, k].ChunkId, _chunkRenderers[i, j, k].ModelMatrix);
+        }
+        world.OnPlayerAdded += OnPlayerAdded;
         Shader.ChunkShader.Use();
         InitFog();
         InitCameraInfo();
@@ -94,11 +104,9 @@ public sealed class WorldRenderer
         GL.DeleteBuffer(CameraInfoBuffer);
     }
 
-    private void OnChunkAdded(ChunkState state, Vector3i index)
+    public void OnPlayerAdded(ushort entity)
     {
-        var renderer = new ChunkRenderer(state, (ushort)(index.X * _chunkRenderers.GetLength(2) * _chunkRenderers.GetLength(1) + index.Y * _chunkRenderers.GetLength(2) + index.Z));
-        _chunkTessellator.SetChunkTransform(renderer.ChunkId, renderer.ModelMatrix);
-        _chunkRenderers[index.X, index.Y, index.Z] = renderer;
+        OtherPlayers.Add(entity, new OtherPlayerRenderer(MinecraftLibrary.Engine.World.Instance.GetPlayer(entity).State));
     }
 
     public void HandleWindowResize(int height, int width)
@@ -109,7 +117,7 @@ public sealed class WorldRenderer
 
     public void Render(float delta)
     {
-        _playerRenderer.UpdateCamera(delta);
+        PlayerRenderer.UpdateCamera(delta);
         var camera = Camera.GetInstance();
         Marshal.Copy(EngineDefaults.GetBytes(camera.GetViewMatrix()).ToArray(), 0, _cameraInfoPointer,
             Marshal.SizeOf<Matrix4>());
@@ -120,7 +128,7 @@ public sealed class WorldRenderer
         UpdateDirtyChunks();
         RenderChunks();
         GL.Enable(EnableCap.Blend);
-        _playerRenderer.RenderSelectionHighlight();
+        PlayerRenderer.RenderSelectionHighlight();
         GL.Disable(EnableCap.Blend);
     }
 
@@ -172,6 +180,7 @@ public sealed class WorldRenderer
     
     public void ApplyTickChanges(Packet changePacket)
     {
+        changePacket.ResetRead();
         changePacket.Read(out ulong worldTime);
         Marshal.Copy(BitConverter.GetBytes((uint)worldTime), 0, _worldInfoPointer, sizeof(uint));
         changePacket.Read(out long _);
@@ -187,13 +196,10 @@ public sealed class WorldRenderer
         for (var i = 0; i < playerCount; i++)
         {
             changePacket.Read(out ushort playerId);
-            if (playerId == _playerRenderer.GetPlayerId())
-            {
-                _playerRenderer.ApplyRevertChanges(changePacket);
-            }
+            if (playerId == PlayerRenderer.GetPlayerId())
+                PlayerRenderer.ApplyRevertChanges(changePacket);
             else
-            {
-            }
+                OtherPlayers[playerId].ApplyRevertChanges(changePacket);
         }
     }
 
@@ -223,13 +229,13 @@ public sealed class WorldRenderer
     
     public bool IsOutOfBounds(Vector3i pos)
     {
-        return pos.X < baseVector.X || pos.Y < baseVector.Y || pos.Z < baseVector.Z || pos.X >= RenderWidth || pos.Y >= RenderHeight ||
+        return pos.X < BaseVector.X || pos.Y < BaseVector.Y || pos.Z < BaseVector.Z || pos.X >= RenderWidth || pos.Y >= RenderHeight ||
                pos.Z >= RenderDepth;
     }
 
     public ChunkRenderer GetChunkRendererAt(Vector3i position)
     {
-        var helper = position - baseVector;
+        var helper = position - BaseVector;
         return _chunkRenderers[helper.X / EngineDefaults.ChunkWidth, helper.Y / EngineDefaults.ChunkHeight, helper.Z / EngineDefaults.ChunkDepth];
     }
 }

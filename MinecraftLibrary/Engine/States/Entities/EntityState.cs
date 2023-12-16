@@ -210,18 +210,23 @@ public abstract class EntityState<TEntityType> : State<TEntityType> where TEntit
         {
             case EEntityChange.Position:
                 packet.Read(out _position);
+                Position = _position;
                 break;
             case EEntityChange.Rotation:
                 packet.Read(out _rotation);
+                Rotation = _rotation;
                 break;
             case EEntityChange.Scale:
                 packet.Read(out _scale);
+                Scale = _scale;
                 break;
             case EEntityChange.Velocity:
                 packet.Read(out _velocity);
+                Velocity = _velocity;
                 break;
             case EEntityChange.IsGrounded:
                 packet.Read(out _isGrounded);
+                IsGrounded = _isGrounded;
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(change), change, "Invalid Entity State Change");

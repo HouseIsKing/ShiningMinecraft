@@ -156,12 +156,15 @@ public abstract class LivingEntityState<TLivingEntityState> : EntityState<TLivin
         {
             case ELivingEntityChange.JumpInput:
                 packet.Read(out _jumpInput);
+                JumpInput = _jumpInput;
                 break;
             case ELivingEntityChange.HorizontalInput:
                 packet.Read(out _horizontalInput);
+                HorizontalInput = _horizontalInput;
                 break;
             case ELivingEntityChange.VerticalInput:
                 packet.Read(out _verticalInput);
+                VerticalInput = _verticalInput;
                 break;
         }
     }

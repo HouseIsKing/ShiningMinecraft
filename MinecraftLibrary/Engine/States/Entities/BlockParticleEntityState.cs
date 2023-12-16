@@ -160,13 +160,15 @@ public sealed class BlockParticleEntityState : EntityState<BlockParticleEntitySt
         {
             case EBlockParticleChange.Type:
                 packet.Read(out byte helper);
-                _blockParticleType = (BlockType)helper;
+                BlockParticleType = (BlockType)helper;
                 break;
             case EBlockParticleChange.LifeTime:
                 packet.Read(out _lifeTime);
+                LifeTime = _lifeTime;
                 break;
             case EBlockParticleChange.MaxLifeTime:
                 packet.Read(out _maxLifeTime);
+                MaxLifeTime = _maxLifeTime;
                 break;
         }
     }

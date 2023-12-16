@@ -5,18 +5,13 @@ using OpenTK.Mathematics;
 
 namespace MinecraftLibrary.Engine.Entities;
 
-public sealed class Player : LivingEntity<PlayerState>
+public sealed class Player(PlayerState state) : LivingEntity<PlayerState>(state)
 {
-    private readonly Queue<KeyValuePair<ulong, ClientInput>> _inputQueue = new();
-    public ulong LastInputProcessed { get; private set; }
+    private readonly Queue<KeyValuePair<uint, ClientInput>> _inputQueue = new();
+    public uint LastInputProcessed { get; private set; }
     public bool FoundBlock { get; private set; }
     public Vector3i HitPosition { get; private set; }
     public BlockFaces HitFace { get; private set; }
-
-    public Player(PlayerState state) : base(state)
-    {
-        State.Scale = EngineDefaults.PlayerSize;
-    }
 
     public override void Tick()
     {
@@ -35,7 +30,7 @@ public sealed class Player : LivingEntity<PlayerState>
         ProcessCurrentPlayerInput();
     }
 
-    public void AddInput(ulong inputId, ClientInput input)
+    public void AddInput(uint inputId, ClientInput input)
     {
         _inputQueue.Enqueue(KeyValuePair.Create(inputId, input));
     }

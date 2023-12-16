@@ -5,41 +5,48 @@ using MinecraftLibrary.Network;
 
 namespace MinecraftServer.Network;
 
-public class NetworkManager
+public sealed class NetworkManager
 {
     private readonly TcpListener _socket;
     private const int Port = 25565;
-    private readonly ConcurrentQueue<ConnectionToClient> _clientsJoined = new();
+    private readonly ConcurrentDictionary<byte, ConnectionToClient> _clientsJoined = new();
+    private ConcurrentQueue<byte> NextAvailableId = new();
     private readonly ConcurrentQueue<KeyValuePair<ConnectionToClient, Packet>> _incomingPackets = new();
 
     public NetworkManager()
     {
+        for (var i = byte.MaxValue; i > 0; i--) NextAvailableId.Enqueue(i);
+        NextAvailableId.Enqueue(0);
         _socket = new TcpListener(IPAddress.Any, Port);
         _socket.Start();
-        _socket.BeginAcceptTcpClient(OnClientConnect, null);
+        var t = _socket.AcceptTcpClientAsync();
+        t.ContinueWith(OnClientConnect);
     }
 
-    private void OnClientConnect(IAsyncResult result)
+    private void OnClientConnect(Task<TcpClient> client)
     {
-        var client = _socket.EndAcceptTcpClient(result);
-        client.NoDelay = true;
-        client.ReceiveTimeout = 100;
-        client.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.TypeOfService, 0x18);
-        client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, false);
-        client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, false);
-        client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, 100);
-        _clientsJoined.Enqueue(new ConnectionToClient(client, this));
-        _socket.BeginAcceptTcpClient(OnClientConnect, null);
+        client.Result.NoDelay = true;
+        client.Result.ReceiveTimeout = 100;
+        client.Result.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.TypeOfService, 0x18);
+        client.Result.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, false);
+        client.Result.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, false);
+        NextAvailableId.TryDequeue(out var id);
+        _clientsJoined.TryAdd(id, new ConnectionToClient(client.Result, this));
+        var t = _socket.AcceptTcpClientAsync();
+        t.ContinueWith(OnClientConnect);
     }
 
     internal void IncomingPacket(ConnectionToClient client, Packet packet)
     {
+        packet.Unpack();
         _incomingPackets.Enqueue(KeyValuePair.Create(client, packet));
     }
 
-    public ConnectionToClient? GetNextReadyClient()
+    public ConnectionToClient GetNextReadyClient()
     {
-        return _clientsJoined.FirstOrDefault(static connectionToClient => connectionToClient.Ready);
+        var result = _clientsJoined.FirstOrDefault(static connectionToClient => connectionToClient.Value.Ready);
+        if (result.Value != null) _clientsJoined.TryRemove(result.Key, out _);
+        return result.Value;
     }
     
     public KeyValuePair<ConnectionToClient, Packet>? GetNextIncomingPacket()

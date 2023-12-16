@@ -30,10 +30,10 @@ public sealed class ChunkRenderer
     {
         ChunkId = id;
         _state = state;
-        _boundingBox = new Box3(_state.ChunkPosition,
-            _state.ChunkPosition + new Vector3i(EngineDefaults.ChunkWidth, EngineDefaults.ChunkHeight,
-                EngineDefaults.ChunkDepth));
-        Position = _state.ChunkPosition;
+        WorldRenderer renderer = WorldRenderer.Instance;
+        Vector3i pos = new Vector3i(_state.X * EngineDefaults.ChunkWidth, _state.Y * EngineDefaults.ChunkHeight, _state.Z * EngineDefaults.ChunkDepth) + renderer.BaseVector;
+        _boundingBox = new Box3(pos, pos + new Vector3i(EngineDefaults.ChunkWidth, EngineDefaults.ChunkHeight, EngineDefaults.ChunkDepth));
+        Position = pos;
         for (ushort i = 0; i < EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth; i++) _dirtyVertexes.Add(i);
         _command.instanceCount = 1;
         _command.baseInstance = 0;
@@ -50,8 +50,9 @@ public sealed class ChunkRenderer
 
     private byte BuildLightByte(ushort index)
     {
-        var pos = EngineDefaults.GetVectorFromIndex(index) + _state.ChunkPosition;
         var world = MinecraftLibrary.Engine.World.Instance;
+        var pos = EngineDefaults.GetVectorFromIndex(index) + new Vector3i(_state.X * EngineDefaults.ChunkWidth,
+            _state.Y * EngineDefaults.ChunkHeight, _state.Z * EngineDefaults.ChunkDepth) + world.GetBaseVector();
         var result = world.GetBrightnessAt(pos + Vector3i.UnitY);
         result |= (byte)(world.GetBrightnessAt(pos + Vector3i.UnitX) << 2);
         result |= (byte)(world.GetBrightnessAt(pos - Vector3i.UnitX) << 3);
@@ -73,20 +74,22 @@ public sealed class ChunkRenderer
             packet.Read(out ushort index);
             packet.Read(out byte _);
             NotifyBlockChange(index);
+            WorldRenderer renderer = WorldRenderer.Instance;
             if (MinecraftLibrary.Engine.Blocks.Block.GetBlock(_state.GetBlockAt(index)).IsSolid()) continue;
-            var helper = EngineDefaults.GetVectorFromIndex(index) + _state.ChunkPosition;
+            var helper = EngineDefaults.GetVectorFromIndex(index) + new Vector3i(_state.X * EngineDefaults.ChunkWidth,
+                _state.Y * EngineDefaults.ChunkHeight, _state.Z * EngineDefaults.ChunkDepth) + renderer.BaseVector;
             var pos = helper + Vector3i.UnitY;
-            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
+            if (!renderer.IsOutOfBounds(pos)) renderer.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
             pos = helper - Vector3i.UnitY;
-            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
+            if (!renderer.IsOutOfBounds(pos)) renderer.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
             pos = helper + Vector3i.UnitX;
-            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
+            if (!renderer.IsOutOfBounds(pos)) renderer.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
             pos = helper - Vector3i.UnitX;
-            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
+            if (!renderer.IsOutOfBounds(pos)) renderer.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
             pos = helper + Vector3i.UnitZ;
-            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
+            if (!renderer.IsOutOfBounds(pos)) renderer.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
             pos = helper - Vector3i.UnitZ;
-            if (!WorldRenderer.Instance.IsOutOfBounds(pos)) WorldRenderer.Instance.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
+            if (!renderer.IsOutOfBounds(pos)) renderer.GetChunkRendererAt(pos).NotifyBlockChange(EngineDefaults.GetIndexFromVector(pos));
         }
     }
 
@@ -102,8 +105,9 @@ public sealed class ChunkRenderer
 
     private bool ShouldDrawCube(ushort index)
     {
-        var pos = EngineDefaults.GetVectorFromIndex(index) + _state.ChunkPosition;
         var world = MinecraftLibrary.Engine.World.Instance;
+        var pos = EngineDefaults.GetVectorFromIndex(index) + new Vector3i(_state.X * EngineDefaults.ChunkWidth,
+            _state.Y * EngineDefaults.ChunkHeight, _state.Z * EngineDefaults.ChunkDepth) + world.GetBaseVector();
         return !world.GetBlockAt(pos + Vector3i.UnitY).IsSolid() ||
                !world.GetBlockAt(pos - Vector3i.UnitY).IsSolid() ||
                !world.GetBlockAt(pos + Vector3i.UnitX).IsSolid() ||
@@ -128,11 +132,6 @@ public sealed class ChunkRenderer
             _dirtyVertexes.Add(index);
             index += EngineDefaults.ChunkDepth;
         }
-    }
-
-    public override int GetHashCode()
-    {
-        return _state.ChunkPosition.GetHashCode();
     }
 
     public byte[] GetDrawCommand()

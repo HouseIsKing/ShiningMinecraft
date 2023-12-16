@@ -89,6 +89,8 @@ public sealed class PlayerState : LivingEntityState<PlayerState>
 
     public override void SerializeChangesToChangePacket(Packet changePacket)
     {
+        if (!IsDirty) return;
+        changePacket.Write(EntityId);
         base.SerializeChangesToChangePacket(changePacket);
         changePacket.Write(_changesCount);
         for (byte i = 0; i < _changes.Length; i++)
@@ -122,6 +124,8 @@ public sealed class PlayerState : LivingEntityState<PlayerState>
 
     public override void SerializeChangesToRevertPacket(Packet revertPacket)
     {
+        if (!IsDirty) return;
+        revertPacket.Write(EntityId);
         base.SerializeChangesToRevertPacket(revertPacket);
         revertPacket.Write(_changesCount);
         for (byte i = 0; i < _changes.Length; i++)
@@ -170,15 +174,24 @@ public sealed class PlayerState : LivingEntityState<PlayerState>
         {
             case EPlayerChange.Mode:
                 packet.Read(out _mode);
+                Mode = _mode;
                 break;
             case EPlayerChange.Pitch:
                 packet.Read(out _pitch);
+                Pitch = _pitch;
                 break;
             case EPlayerChange.CurrentSelectedBlock:
                 packet.Read(out byte blockType);
-                _currentSelectedBlock = (BlockType)blockType;
+                CurrentSelectedBlock = (BlockType)blockType;
                 break;
             case EPlayerChange.Input:
+                IsDirty = true;
+                if (!_changes[(byte)EPlayerChange.Input].Item1)
+                {
+                    _changes[(byte)EPlayerChange.Input].Item1 = true;
+                    _changes[(byte)EPlayerChange.Input].Item2 = PlayerInput;
+                    _changesCount++;
+                }
                 PlayerInput.Deserialize(packet);
                 break;
         }

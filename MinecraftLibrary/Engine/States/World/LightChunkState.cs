@@ -3,9 +3,10 @@ using OpenTK.Mathematics;
 
 namespace MinecraftLibrary.Engine.States.World;
 
-public sealed class LightChunkState(Vector2i pos) : State<LightChunkState>
+public sealed class LightChunkState(ushort x, ushort z) : State<LightChunkState>
 {
-    public Vector2i LightPosition { get; } = pos;
+    public ushort X { get; } = x;
+    public ushort Z { get; } = z;
     public byte LightLevel
     {
         get => _lightLevel;
@@ -21,7 +22,8 @@ public sealed class LightChunkState(Vector2i pos) : State<LightChunkState>
 
     public override void Serialize(Packet packet)
     {
-        packet.Write(LightPosition);
+        packet.Write(X);
+        packet.Write(Z);
         packet.Write(LightLevel);
     }
 
@@ -32,12 +34,18 @@ public sealed class LightChunkState(Vector2i pos) : State<LightChunkState>
 
     public override void SerializeChangesToChangePacket(Packet changePacket)
     {
+        if (!IsDirty) return;
+        changePacket.Write(X);
+        changePacket.Write(Z);
         base.SerializeChangesToChangePacket(changePacket);
         changePacket.Write(_lightLevel);
     }
 
     public override void SerializeChangesToRevertPacket(Packet revertPacket)
     {
+        if (!IsDirty) return;
+        revertPacket.Write(X);
+        revertPacket.Write(Z);
         base.SerializeChangesToRevertPacket(revertPacket);
         revertPacket.Write(_changes);
     }
@@ -45,5 +53,6 @@ public sealed class LightChunkState(Vector2i pos) : State<LightChunkState>
     public override void DeserializeChanges(Packet changePacket)
     {
         changePacket.Read(out _lightLevel);
+        LightLevel = _lightLevel;
     }
 }

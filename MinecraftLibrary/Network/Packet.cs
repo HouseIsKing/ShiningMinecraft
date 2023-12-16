@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.IO.Compression;
+using System.Runtime.InteropServices;
 using System.Text;
 using MinecraftLibrary.Input;
 using MinecraftLibrary.Engine;
@@ -10,13 +11,15 @@ public sealed class Packet(PacketHeader header)
 {
     public PacketHeader Header = header;
     private readonly List<byte> _data = new(4096);
+    private byte[] _dataPack;
     private int _dataPos = 0;
 
-    public Packet(PacketHeader header, IEnumerable<byte> data) : this(header)
+    public Packet(PacketHeader header, IReadOnlyCollection<byte> data) : this(header)
     {
+        Header.Size = (uint)data.Count;
         _data.AddRange(data);
     }
-
+    
     public void Write(IEnumerable<byte> data)
     {
         _data.AddRange(data);
@@ -194,6 +197,16 @@ public sealed class Packet(PacketHeader header)
     {
         return _data.GetRange(_dataPos, _data.Count - _dataPos).ToArray();
     }
+    
+    public void Skip(int count)
+    {
+        _dataPos += count;
+    }
+    
+    public void RevertRead(int count)
+    {
+        _dataPos -= count;
+    }
 
     public void ResetRead()
     {
@@ -206,8 +219,26 @@ public sealed class Packet(PacketHeader header)
         _data.Clear();
     }
 
-    public void WriteDataLength()
+    public void Package()
     {
-        Header.Size = (uint)_data.Count;
+        var ms = new MemoryStream();
+        using var zs = new GZipStream(ms, CompressionMode.Compress);
+        zs.Write(_data.ToArray());
+        zs.Close();
+        _dataPack = ms.ToArray();
+        _data.Clear();
+        Header.Size = (uint)_dataPack.Length;
+        _data.AddRange(_dataPack);
+    }
+
+    public void Unpack()
+    {
+        var ms = new MemoryStream(_data.ToArray());
+        using var zs = new GZipStream(ms, CompressionMode.Decompress);
+        var unpackedMs = new MemoryStream();
+        zs.CopyTo(unpackedMs);
+        _data.Clear();
+        _data.AddRange(unpackedMs.ToArray());
+        zs.Close();
     }
 }

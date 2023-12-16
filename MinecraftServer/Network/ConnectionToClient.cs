@@ -7,83 +7,129 @@ namespace MinecraftServer.Network;
 
 public sealed class ConnectionToClient
 {
-    public string Username { get; private set; } = "";
-    public ulong LastTickSent { get; set; }
-    public ulong LastInputProcessed { get; set; }
+    internal string Username { get; private set; } = "";
     private readonly TcpClient _socket;
     private readonly NetworkManager _networkManager;
-    private readonly Packet _packetRead = new(PacketHeader.ClientInputHeader);
-    private readonly byte[] _headerBuffer = new byte[8];
-    private byte[] _packetBuffer = Array.Empty<byte>();
-    private Packet? _packetWrite = new(PacketHeader.ClientInputHeader);
+    private PacketHeader _headerRead;
+    private PacketHeader _headerWrite;
+    private uint _readCounter;
+    private uint _writeCounter;
+    private readonly byte[] _packetBuffer = new byte[1024];
+    private readonly byte[] _packetBufferWrite = new byte[16777216];
     private readonly ConcurrentQueue<Packet> _outgoingPackets = new();
-    private readonly Thread _sendThread;
-    public bool Ready { get; private set; }
+    private Task _sendTask = Task.CompletedTask;
+    internal bool Ready { get; private set; }
 
-    public ConnectionToClient(TcpClient socket, NetworkManager networkManager)
+    internal ConnectionToClient(TcpClient socket, NetworkManager networkManager)
     {
         _socket = socket;
         _networkManager = networkManager;
-        _socket.Client.BeginReceive(_headerBuffer, 0, 8, SocketFlags.None, OnPacketHeader, null);
-        _sendThread = new Thread(SendPacketsThread);
-        _sendThread.Start();
+        var t = _socket.Client.ReceiveAsync(new ArraySegment<byte>(_packetBuffer, 0, 8));
+        t.ContinueWith(OnPacketHeader);
     }
 
-    private void OnPacketHeader(IAsyncResult result)
+    private void OnPacketHeader(Task<int> result)
     {
-        _packetRead.Reset();
-        _packetRead.Header.Type = (PacketType)BitConverter.ToUInt32(_headerBuffer, 0);
-        _packetRead.Header.Size = BitConverter.ToUInt32(_headerBuffer, 4);
-        _packetBuffer = new byte[_packetRead.Header.Size];
-        _socket.Client.BeginReceive(_packetBuffer, 0, (int)_packetRead.Header.Size, SocketFlags.None, OnPacketData, null);
+        Task<int> t;
+        if (result.Result + _readCounter < 8)
+        {
+            _readCounter += (uint)result.Result;
+            t = _socket.Client.ReceiveAsync(new ArraySegment<byte>(_packetBuffer, (int)_readCounter, 8 - (int)_readCounter));
+            t.ContinueWith(OnPacketHeader);
+            return;
+        }
+
+        _readCounter = 0;
+        _headerRead.Type = (PacketType)BitConverter.ToUInt32(_packetBuffer, 0);
+        _headerRead.Size = BitConverter.ToUInt32(_packetBuffer, 4);
+        t = _socket.Client.ReceiveAsync(new ArraySegment<byte>(_packetBuffer, 0, (int)_headerRead.Size));
+        t.ContinueWith(OnPacketData);
     }
 
-    private void OnPacketData(IAsyncResult result)
+    private void OnPacketData(Task<int> result)
     {
-        _packetRead.Write(_packetBuffer);
-        switch (_packetRead.Header.Type)
+        Task<int> t;
+        if (result.Result + _readCounter < _headerRead.Size)
+        {
+            _readCounter += (uint)result.Result;
+            t = _socket.Client.ReceiveAsync(new ArraySegment<byte>(_packetBuffer, (int)_readCounter, (int)(_headerRead.Size - _readCounter)));
+            t.ContinueWith(OnPacketData);
+            return;
+        }
+
+        _readCounter = 0;
+        switch (_headerRead.Type)
         {
             case PacketType.PlayerId:
                 if (!Ready)
                 {
-                    Username = Encoding.UTF8.GetString(_packetBuffer);
+                    Username = Encoding.UTF8.GetString(_packetBuffer, 0, (int)_headerRead.Size);
                     Ready = true;
                 }
-
                 break;
             case PacketType.ClientInput:
-                _networkManager.IncomingPacket(this, _packetRead);
+                _networkManager.IncomingPacket(this, new Packet(_headerRead, new ArraySegment<byte>(_packetBuffer, 0, (int)_headerRead.Size)));
                 break;
         }
-
-        _socket.Client.BeginReceive(_headerBuffer, 0, 8, SocketFlags.None, OnPacketHeader, null);
+        t = _socket.Client.ReceiveAsync(new ArraySegment<byte>(_packetBuffer, 0, 8));
+        t.ContinueWith(OnPacketHeader);
     }
 
-    public void SendPacket(Packet packet)
+    internal void SendPacketPacked(Packet packet)
     {
         _outgoingPackets.Enqueue(packet);
+        if (!_sendTask.IsCompleted) return;
+        _outgoingPackets.TryDequeue(out packet);
+        _writeCounter = 0;
+        if (packet != null)
+        {
+            _headerWrite = packet.Header;
+            Buffer.BlockCopy(packet.Header.GetBytes(), 0, _packetBufferWrite, 0, 8);
+            Buffer.BlockCopy(packet.ReadAll(), 0, _packetBufferWrite, 8, (int)packet.Header.Size);
+        }
+
+        var t = _socket.Client.SendAsync(new ArraySegment<byte>(_packetBufferWrite, 0, (int)_headerWrite.Size + 8), SocketFlags.None);
+        _sendTask = t.ContinueWith(OnPacketSend);
+    }
+
+    internal void SendPacket(Packet packet)
+    {
+        packet.Package();
+        SendPacketPacked(packet);
+    }
+
+    private void OnPacketSend(Task<int> result)
+    {
+        if (result.Result + _writeCounter < _headerWrite.Size + 8)
+        {
+            _writeCounter += (uint)result.Result;
+            var t = _socket.Client.SendAsync(new ArraySegment<byte>(_packetBufferWrite, (int)_writeCounter, (int)_headerWrite.Size + 8 - (int)_writeCounter), SocketFlags.None);
+            _sendTask = t.ContinueWith(OnPacketSend);
+        }
+        else
+        {
+            if (!_outgoingPackets.TryDequeue(out var packet)) return;
+            _writeCounter = 0;
+            _headerWrite = packet.Header;
+            Buffer.BlockCopy(packet.Header.GetBytes(), 0, _packetBufferWrite, 0, 8);
+            Buffer.BlockCopy(packet.ReadAll(), 0, _packetBufferWrite, 8, (int)packet.Header.Size);
+            var t = _socket.Client.SendAsync(new ArraySegment<byte>(_packetBufferWrite, 0, (int)_headerWrite.Size + 8), SocketFlags.None);
+            _sendTask = t.ContinueWith(OnPacketSend);
+        }
     }
 
     ~ConnectionToClient()
     {
         _socket.Close();
-        _sendThread.Join();
-    }
-
-    private void SendPacketsThread()
-    {
-        while (true)
-        {
-            if (!_outgoingPackets.TryDequeue(out _packetWrite)) continue;
-
-            _socket.Client.Send(_packetWrite.Header.getBytes(), 0, 8, SocketFlags.None);
-            _socket.Client.Send(_packetWrite.ReadAll(), 0, (int)_packetWrite.Header.Size, SocketFlags.None);
-        }
     }
 
     public override int GetHashCode()
     {
-        // ReSharper disable once NonReadonlyMemberInGetHashCode
         return Username.GetHashCode();
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is ConnectionToClient client && client.Username == Username;
     }
 }

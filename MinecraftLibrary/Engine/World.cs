@@ -22,8 +22,7 @@ public sealed class World
     private readonly List<ushort> _playersToDespawn = new();
     private readonly List<ushort> _blockParticlesToDespawn = new();
     private readonly List<Box3> _blocksCollidingBuffer = new();
-    public event EngineDefaults.ChunkAddedHandler OnChunkAdded;
-    public event EngineDefaults.PlayerAddedHandler OnPlayerAdded;
+    public event EngineDefaults.EntityAddedHandler OnPlayerAdded;
     public event EngineDefaults.TickStartHandler OnTickStart;
     public event EngineDefaults.TickEndHandler OnTickEnd;
     private WorldState State { get; }
@@ -42,6 +41,8 @@ public sealed class World
 
         State = new WorldState(WorldWidth, WorldHeight, WorldDepth);
         Instance = this;
+        State.EntityAdded += EntityAddedThroughState;
+        State.EntityRemoved += EntityRemovedThroughState;
     }
 
     ~World()
@@ -49,17 +50,52 @@ public sealed class World
         Instance = null;
     }
 
+    private void EntityAddedThroughState(ushort entityId)
+    {
+        switch (State.GetEntityType(entityId))
+        {
+            case EntityType.Player:
+                _players.Add(entityId, new Player(State.GetEntity<PlayerState>(entityId)));
+                OnPlayerAdded?.Invoke(entityId);
+                break;
+            case EntityType.Zombie:
+                throw new NotImplementedException();
+            case EntityType.BlockBreakParticle:
+                throw new NotImplementedException();
+            case EntityType.Null:
+                throw new NotImplementedException();
+        }
+    }
+
+    private void EntityRemovedThroughState(ushort entityId)
+    {
+        switch (State.GetEntityType(entityId))
+        {
+            case EntityType.Player:
+                _players.Remove(entityId);
+                break;
+            case EntityType.Zombie:
+                throw new NotImplementedException();
+            case EntityType.BlockBreakParticle:
+                throw new NotImplementedException();
+            case EntityType.Null:
+                throw new NotImplementedException();
+        }
+    }
+
     private void PreTick()
     {
         foreach (var state in _playersToSpawn)
         {
+            state.DiscardChanges();
             State.RegisterPlayer(state);
             _players.Add(state.EntityId, new Player(state));
-            OnPlayerAdded?.Invoke(state);
+            OnPlayerAdded?.Invoke(state.EntityId);
         }
 
         foreach (var state in _blockParticlesToSpawn)
         {
+            state.DiscardChanges();
             State.RegisterBlockParticle(state);
             _blockParticles.Add(state.EntityId, new BlockParticleEntity(state));
         }
@@ -99,7 +135,20 @@ public sealed class World
             State.SerializeChangesToRevertPacket(packet);
         else
             State.SerializeChangesToChangePacket(packet);
-        packet.WriteDataLength();
+    }
+
+    public void SimulateTick(Packet packet, bool revertPacket)
+    {
+        packet.Reset();
+        PreTick();
+        State.WorldTime += 1;
+        TickEntities();
+        TickWorld();
+        PostTick();
+        if (revertPacket)
+            State.SerializeChangesToRevertPacket(packet);
+        else
+            State.SerializeChangesToChangePacket(packet);
     }
 
     private void PostTick()
@@ -129,8 +178,6 @@ public sealed class World
     
     public void LoadWorld()
     {
-        GenerateChunks(WorldWidth / EngineDefaults.ChunkWidth, WorldHeight / EngineDefaults.ChunkHeight,
-            WorldDepth / EngineDefaults.ChunkDepth);
         GZipStream stream = new(File.OpenRead("world.dat"), CompressionMode.Decompress);
         State.LoadWorld(stream);
         stream.Close();
@@ -144,6 +191,7 @@ public sealed class World
     public PlayerState SpawnPlayer()
     {
         var state = State.AddPlayer();
+        state.Scale = EngineDefaults.PlayerSize;
         _playersToSpawn.Add(state);
         return state;
     }
@@ -173,8 +221,7 @@ public sealed class World
             return Block.GetBlock(BlockType.Air);
 
         var chunk = GetChunkAt(pos);
-        var indexVector = pos - chunk.ChunkPosition;
-        return Block.GetBlock(chunk.GetBlockAt(EngineDefaults.GetIndexFromVector(indexVector)));
+        return Block.GetBlock(chunk.GetBlockAt(EngineDefaults.GetIndexFromVector(pos)));
     }
 
     public List<Box3> GetBlocksColliding(Box3 collider)
@@ -208,42 +255,19 @@ public sealed class World
     {
         if (IsOutOfBounds(pos)) return;
         var chunk = GetChunkAt(pos);
-        var indexVector = pos - chunk.ChunkPosition;
-        chunk.SetBlockAt(EngineDefaults.GetIndexFromVector(indexVector), block);
+        chunk.SetBlockAt(EngineDefaults.GetIndexFromVector(pos), block);
         RecalculateLight(pos, block);
     }
 
     public bool IsOutOfBounds(Vector3i pos)
     {
-        var baseVector = State.GetBaseVector();
+        var baseVector = State.BaseVector;
         return pos.X < baseVector.X || pos.Y < baseVector.Y || pos.Z < baseVector.Z || pos.X >= WorldWidth || pos.Y >= WorldHeight ||
                pos.Z >= WorldDepth;
     }
 
-    private void GenerateChunks(ushort amountX, ushort amountY, ushort amountZ)
-    {
-        for (var x = 0; x < amountX; x++)
-        for (var z = 0; z < amountZ; z++)
-        {
-            for (var y = 0; y < amountY; y++)
-            {
-                var pos = new Vector3i(x * EngineDefaults.ChunkWidth, y * EngineDefaults.ChunkHeight,
-                    z * EngineDefaults.ChunkDepth);
-                State.AddChunk(pos);
-                pos -= State.GetBaseVector();
-                OnChunkAdded?.Invoke(State.GetChunkAt(pos), new Vector3i(pos.X / EngineDefaults.ChunkWidth, pos.Y / EngineDefaults.ChunkHeight, pos.Z / EngineDefaults.ChunkDepth));
-            }
-
-            for (var i = 0; i < EngineDefaults.ChunkWidth; i++)
-            for (var j = 0; j < EngineDefaults.ChunkDepth; j++)
-                State.AddLight(new Vector2i(x * EngineDefaults.ChunkWidth + i, z * EngineDefaults.ChunkDepth + j));
-        }
-    }
-
     public void GenerateLevel()
     {
-        GenerateChunks(WorldWidth / EngineDefaults.ChunkWidth, WorldHeight / EngineDefaults.ChunkHeight,
-            WorldDepth / EngineDefaults.ChunkDepth);
         var heightMap1 = new PerlinNoise(0);
         var heightMap2 = new PerlinNoise(1);
         var firstHeightMap = heightMap1.Generate(WorldWidth, WorldDepth);
@@ -354,6 +378,21 @@ public sealed class World
     {
         State.Serialize(packet);
     }
+    
+    public void Deserialize(Packet packet)
+    {
+        State.Deserialize(packet);
+    }
+    
+    public void DeserializeChanges(Packet packet)
+    {
+        State.DeserializeChanges(packet);
+    }
+    
+    public void DiscardChanges()
+    {
+        State.DiscardChanges();
+    }
 
     public Player GetPlayer(ushort id)
     {
@@ -368,6 +407,11 @@ public sealed class World
     
     public Vector3i GetBaseVector()
     {
-        return State.GetBaseVector();
+        return State.BaseVector;
+    }
+    
+    public void SerializeChangesToRevertPacket(Packet packet)
+    {
+        State.SerializeChangesToRevertPacket(packet);
     }
 }

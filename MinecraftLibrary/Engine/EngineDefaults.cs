@@ -15,7 +15,7 @@ public static class EngineDefaults
     public const int ChunkDepth = 16;
     public const float CameraOffset = 1.62f;
     public const float TickRate = 0.05f;
-    public const int PacketHistorySize = 20;
+    public const int PacketHistorySize = 40;
     public static readonly Vector3 PlayerSize = new(0.3f, 0.9f, 0.3f);
     public static readonly Vector3 ParticleSize = new(0.1f);
     public static IEnumerable<byte> GetBytes<T>(T data) where T : struct
@@ -171,7 +171,8 @@ public static class EngineDefaults
     public delegate void TickStartHandler();
     public delegate void TickEndHandler();
     public delegate void ChunkAddedHandler(ChunkState state, Vector3i index);
-    public delegate void PlayerAddedHandler(PlayerState state);
+    public delegate void EntityAddedHandler(ushort entityId);
+    public delegate void EntityRemovedHandler(ushort entityId);
 
     public delegate void StateChangedHandler();
 }

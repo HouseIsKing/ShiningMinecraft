@@ -6,5 +6,6 @@ public enum EWorldChange
     WorldEntityLeave,
     WorldChunk,
     WorldLight,
-    WorldEntity
+    WorldEntity,
+    WorldBaseVector
 }

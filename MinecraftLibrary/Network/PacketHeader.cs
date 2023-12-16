@@ -18,7 +18,8 @@ public struct PacketHeader(PacketType type)
         Size = size;
     }
 
-    public byte[] getBytes() {
+    public readonly byte[] GetBytes()
+    {
         var size = Marshal.SizeOf<PacketHeader>();
         var arr = new byte[size];
         var ptr = IntPtr.Zero;

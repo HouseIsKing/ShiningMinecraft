@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Net;
 
 namespace MinecraftClient;
 
@@ -10,9 +11,9 @@ file static class Program
         {
             p.PriorityClass = ProcessPriorityClass.AboveNormal;
         }
-        if (args.Length > 3 && args[1] == "Server")
+        if (args.Length > 2 && args[0] == "Server")
         {
-            MinecraftClientMP server = new();
+            MinecraftClientMp server = new(IPAddress.Parse(args[1]), args[2]);
             server.Run();
         }
         else

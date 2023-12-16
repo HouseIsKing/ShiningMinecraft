@@ -10,20 +10,18 @@ namespace MinecraftServer;
 internal sealed class ServerManager
 {
     private readonly World _world = new();
-    private float _tickTimer;
+    private double _tickTimer;
     private readonly Dictionary<ConnectionToClient, Player> _players = new();
-    private readonly Dictionary<ushort, ConnectionToClient> _newlyJoinedClients = new();
+    private (ushort, ConnectionToClient) _newlyJoinedClient = (0, null);
     private readonly NetworkManager _networkManager = new();
     private readonly Packet[] _packetHistory = new Packet[EngineDefaults.PacketHistorySize];
+    private long _lastTickTime;
 
     internal ServerManager()
     {
         _world.GenerateLevel();
         Console.WriteLine("Server Started");
-        for (var i = 0; i < _packetHistory.Length; i++)
-        {
-            _packetHistory[i] = new Packet(new PacketHeader(PacketType.WorldChange));
-        }
+        for (var i = 0; i < _packetHistory.Length; i++) _packetHistory[i] = new Packet(new PacketHeader(PacketType.WorldChange));
         _world.OnTickStart += PreTick;
     }
 
@@ -34,67 +32,74 @@ internal sealed class ServerManager
 
     private void PreTick()
     {
+        if (_newlyJoinedClient.Item2 != null)
+        {
+            var worldPacket = new Packet(new PacketHeader(PacketType.WorldState));
+            _world.Serialize(worldPacket);
+            _newlyJoinedClient.Item2.SendPacket(worldPacket);
+            _players.Add(_newlyJoinedClient.Item2, _world.GetPlayer(_newlyJoinedClient.Item1));
+            _newlyJoinedClient = (0, null);
+        }
+
         var newClient = _networkManager.GetNextReadyClient();
         if (newClient != null)
         {
             var state = _world.SpawnPlayer();
-            state.Position = new Vector3(0, 70.0f, 0.0f);
-            _newlyJoinedClients.Add(state.EntityId, newClient);
+            state.Position = new Vector3(5.0f, 70.0f, 5.0f);
+            var packetToSend = new Packet(PacketHeader.PlayerIdPacket);
+            packetToSend.Write(state.EntityId);
+            newClient.SendPacket(packetToSend);
+            _newlyJoinedClient = (state.EntityId, newClient);
         }
 
         var incomingPacket = _networkManager.GetNextIncomingPacket();
-        if (incomingPacket == null) return;
-
-        var (client, packet) = incomingPacket.Value;
-        switch (packet.Header.Type)
+        while (incomingPacket != null)
         {
-            case PacketType.ClientInput:
-                packet.Read(out ulong inputId);
-                var input = EngineDefaults.FromBytes(packet.ReadLeft());
-                var player = _players[client];
-                player.AddInput(inputId, input);
-                break;
+            var (client, packet) = incomingPacket.Value;
+            switch (packet.Header.Type)
+            {
+                case PacketType.ClientInput:
+                    packet.Read(out uint inputId);
+                    var input = EngineDefaults.FromBytes(packet.ReadLeft());
+                    _players[client].AddInput(inputId, input);
+                    break;
+            }
+            incomingPacket = _networkManager.GetNextIncomingPacket();
         }
     }
 
     private void PostTick()
     {
-        foreach (var connection in _players.Where(static connection =>
-                     connection.Key.LastInputProcessed != connection.Value.LastInputProcessed))
+        var packet = _packetHistory[_world.GetWorldTime() % (ulong)_packetHistory.Length];
+        foreach (var connection in _players)
         {
-            for (var i = connection.Key.LastTickSent + 1; i <= _world.GetWorldTime(); i++)
-                connection.Key.SendPacket(_packetHistory[i % (ulong)_packetHistory.Length]);
-            connection.Key.LastTickSent = _world.GetWorldTime();
-            connection.Key.LastInputProcessed = connection.Value.LastInputProcessed;
+            packet.Header.Type = (PacketType)(connection.Value.LastInputProcessed);
+            connection.Key.SendPacketPacked(packet);
         }
-
-        if (_newlyJoinedClients.Count <= 0) return;
-
-        var packet = new Packet(new PacketHeader(PacketType.WorldState));
-        _world.Serialize(packet);
-        packet.WriteDataLength();
-        foreach (var connection in _newlyJoinedClients)
-        {
-            connection.Value.SendPacket(packet);
-            _players.Add(connection.Value, _world.GetPlayer(connection.Key));
-        }
-
-        _newlyJoinedClients.Clear();
     }
 
     internal void Run()
     {
-        var start = Stopwatch.GetTimestamp();
-        for (var i = 0; i < _tickTimer / EngineDefaults.TickRate; i++)
+        if (_lastTickTime == 0) _lastTickTime = Stopwatch.GetTimestamp();
+        var i = (int)(_tickTimer / EngineDefaults.TickRate);
+        for (; i > 0; i--)
         {
+            var start = Stopwatch.GetTimestamp();
             _world.Tick(_packetHistory[(_world.GetWorldTime() + 1ul) % (ulong)_packetHistory.Length], false);
+            _packetHistory[_world.GetWorldTime() % (ulong)_packetHistory.Length].Package();
             PostTick();
-            _tickTimer -= EngineDefaults.TickRate;
+            _tickTimer -= EngineDefaults.TickRate; 
+            var timeTook = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+            Console.WriteLine($"Tick took {timeTook} milliseconds");
+        }
+        
+        //_tickTimer -= _tickTimer / EngineDefaults.TickRate;
+        while (Stopwatch.GetElapsedTime(_lastTickTime).TotalMilliseconds < 0.1)
+        {
         }
 
-        //_tickTimer -= _tickTimer / EngineDefaults.TickRate;
-        var timeTook = (float)Stopwatch.GetElapsedTime(start).TotalSeconds;
-        _tickTimer += timeTook;
-        if (timeTook > 0.001f) Console.WriteLine($"Tick took {timeTook} seconds");
+        var timer = Stopwatch.GetTimestamp();
+        _tickTimer += new TimeSpan(timer - _lastTickTime).TotalSeconds;
+        _lastTickTime = timer;
     }
 }

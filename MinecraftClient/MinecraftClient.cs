@@ -18,26 +18,28 @@ namespace MinecraftClient;
 public abstract class MinecraftClient : GameWindow 
 {
     protected World World { get; }
-    protected WorldRenderer WorldRenderer;
+    protected readonly WorldRenderer WorldRenderer;
     protected PlayerState Player;
     protected ClientInput Input = new();
-    private float _ticker;
-    protected readonly Packet Packet = new(new PacketHeader());
+    protected double Ticker;
+    private long _startTickTime;
+    protected uint InputId { get; private set; }
+    protected readonly Packet[] PacketHistory = new Packet[EngineDefaults.PacketHistorySize];
     protected MinecraftClient(World world) : base(GameWindowSettings.Default,
         new NativeWindowSettings
         {
             API = ContextAPI.OpenGL, APIVersion = new Version(4, 6), Vsync = VSyncMode.Off,
             Size = new Vector2i(1280, 720), Title = "Shining Minecraft Client", NumberOfSamples = 4,
-            Profile = ContextProfile.Core, MinimumSize = new Vector2i(640, 480), WindowState = WindowState.Fullscreen,
+            Profile = ContextProfile.Core, MinimumSize = new Vector2i(640, 480), WindowState = WindowState.Normal,
             WindowBorder = WindowBorder.Resizable, CurrentMonitor = Monitors.GetPrimaryMonitor().Handle,
             Flags = ContextFlags.Debug, StartVisible = true, StartFocused = true
         })
     {
+        for (var i = 0; i < PacketHistory.Length; i++) PacketHistory[i] = new Packet(new PacketHeader(PacketType.WorldChange));
         World = world;
-        Player = world.SpawnPlayer();
-        WorldRenderer = new WorldRenderer(new PlayerRenderer(Player));
         World.OnTickStart += PreTick;
         World.OnTickEnd += PostTick;
+        WorldRenderer = new WorldRenderer(new PlayerRenderer(null));
         GL.DebugMessageCallback(HandleDebug, IntPtr.Zero);
         GLFW.SetErrorCallback(HandleError);
         CursorState = CursorState.Grabbed;
@@ -63,6 +65,7 @@ public abstract class MinecraftClient : GameWindow
 
     protected override void OnUpdateFrame(FrameEventArgs args)
     {
+        if (_startTickTime == 0) _startTickTime = Stopwatch.GetTimestamp();
         base.OnUpdateFrame(args);
         Input.MouseX += MouseState.Delta.X;
         Input.MouseY -= MouseState.Delta.Y;
@@ -81,29 +84,30 @@ public abstract class MinecraftClient : GameWindow
                                (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.A)) << 4) |
                                (Convert.ToInt32(KeyboardState.IsKeyDown(Keys.D)) << 5));
         if (KeyboardState.IsKeyDown(Keys.Escape)) Close();
+        var i = (int)(Ticker / EngineDefaults.TickRate);
+        for (; i > 0; i--)
+        {
+            var startTick = Stopwatch.GetTimestamp();
+            var p = PacketHistory[(InputId + 1ul) % (ulong)PacketHistory.Length];
+            World.Tick(p, true);
+            WorldRenderer.ApplyTickChanges(p);
+            Ticker -= EngineDefaults.TickRate;
+            var timeTookTick = (float)Stopwatch.GetElapsedTime(startTick).TotalMilliseconds;
+            Console.WriteLine($"Tick took {timeTookTick} ms");
+        }
     }
 
     protected override void OnRenderFrame(FrameEventArgs args)
     {
-        var start = Stopwatch.GetTimestamp();
         base.OnRenderFrame(args);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-        var i = (int)(_ticker / EngineDefaults.TickRate);
-        for (; i > 0; i--)
-        {
-            var startTick = Stopwatch.GetTimestamp();
-            Packet.Reset();
-            World.Tick(Packet, true);
-            WorldRenderer.ApplyTickChanges(Packet);
-            _ticker -= EngineDefaults.TickRate;
-            var timeTookTick = (float)Stopwatch.GetElapsedTime(startTick).TotalMilliseconds;
-            Console.WriteLine($"Tick took {timeTookTick} ms");
-        }
-        WorldRenderer.Render(_ticker / EngineDefaults.TickRate);
+        WorldRenderer.Render((float)Ticker / EngineDefaults.TickRate);
         SwapBuffers();
-        var timeTook = (float)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+        var timeTook = Stopwatch.GetElapsedTime(_startTickTime).TotalMilliseconds;
         Console.WriteLine($"Render took {timeTook} ms");
-        _ticker += timeTook / 1000.0f;
+        var timer = Stopwatch.GetTimestamp();
+        Ticker += new TimeSpan(timer - _startTickTime).TotalSeconds;
+        _startTickTime = timer;
     }
 
     private static void HandleError(ErrorCode errorCode, string description)
@@ -111,6 +115,17 @@ public abstract class MinecraftClient : GameWindow
         Console.WriteLine($"Error: {errorCode} - {description}");
     }
 
-    protected abstract void PreTick();
-    protected abstract void PostTick();
+    protected virtual void PreTick()
+    {
+        if (!Player.DidSpawn) return;
+        Input.MouseX *= 0.4f;
+        Input.MouseY *= 0.4f;
+        InputId++;
+        World.Instance.GetPlayer(Player.EntityId).AddInput(InputId, Input);
+    }
+
+    protected virtual void PostTick()
+    {
+        Input = new ClientInput();
+    }
 }
