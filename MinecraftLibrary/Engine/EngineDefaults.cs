@@ -1,7 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
-using MinecraftLibrary.Engine.Blocks;
-using MinecraftLibrary.Engine.States.Entities;
 using MinecraftLibrary.Engine.States.World;
 using MinecraftLibrary.Input;
 using OpenTK.Mathematics;
