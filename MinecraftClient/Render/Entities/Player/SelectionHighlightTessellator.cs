@@ -6,7 +6,7 @@ using OpenTK.Mathematics;
 
 namespace MinecraftClient.Render.Entities.Player;
 
-public sealed class SelectionHighlightTessellator : Tessellator
+internal sealed class SelectionHighlightTessellator : Tessellator
 {
     private static readonly byte[] VertexHelper = new byte[4];
     private readonly IntPtr _vboPointer;
@@ -39,7 +39,7 @@ public sealed class SelectionHighlightTessellator : Tessellator
         GL.UnmapNamedBuffer(Vbo);
     }
 
-    internal override void Draw(ushort commandsCount)
+    internal override void Draw()
     {
         float alpha;
         if (Mode)
@@ -58,7 +58,7 @@ public sealed class SelectionHighlightTessellator : Tessellator
             Shader.SelectionHighlightAShader.SetFloat("alpha", alpha);
             Shader.SelectionHighlightAShader.SetVector3("hitPos", _position);
         }
-        base.Draw(commandsCount);
+
         GL.DrawElementsIndirect(PrimitiveType.Points, DrawElementsType.UnsignedByte, IntPtr.Zero);
     }
     

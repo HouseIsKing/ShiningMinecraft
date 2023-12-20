@@ -5,7 +5,7 @@ using MinecraftLibrary.Network;
 
 namespace MinecraftServer.Network;
 
-public sealed class ConnectionToClient
+internal sealed class ConnectionToClient
 {
     internal string Username { get; private set; } = "";
     private readonly TcpClient _socket;
@@ -30,6 +30,11 @@ public sealed class ConnectionToClient
 
     private void OnPacketHeader(Task<int> result)
     {
+        if (result.IsFaulted)
+        {
+            _networkManager.DisconnectClient(this);
+            return;
+        }
         Task<int> t;
         if (result.Result + _readCounter < 8)
         {
@@ -48,6 +53,11 @@ public sealed class ConnectionToClient
 
     private void OnPacketData(Task<int> result)
     {
+        if (result.IsFaulted)
+        {
+            _networkManager.DisconnectClient(this);
+            return;
+        }
         Task<int> t;
         if (result.Result + _readCounter < _headerRead.Size)
         {
@@ -68,7 +78,11 @@ public sealed class ConnectionToClient
                 }
                 break;
             case PacketType.ClientInput:
-                _networkManager.IncomingPacket(this, new Packet(_headerRead, new ArraySegment<byte>(_packetBuffer, 0, (int)_headerRead.Size)));
+                var packet = _networkManager.GetNextAvailablePacket();
+                packet.Reset();
+                packet.Header = _headerRead;
+                packet.Write(new ArraySegment<byte>(_packetBuffer, 0, (int)_headerRead.Size));
+                _networkManager.IncomingPacket(this, packet);
                 break;
         }
         t = _socket.Client.ReceiveAsync(new ArraySegment<byte>(_packetBuffer, 0, 8));
@@ -100,6 +114,11 @@ public sealed class ConnectionToClient
 
     private void OnPacketSend(Task<int> result)
     {
+        if (result.IsFaulted)
+        {
+            _networkManager.DisconnectClient(this);
+            return;
+        }
         if (result.Result + _writeCounter < _headerWrite.Size + 8)
         {
             _writeCounter += (uint)result.Result;

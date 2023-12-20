@@ -2,11 +2,11 @@
 
 namespace MinecraftClient.Render.Entities.Player;
 
-public readonly struct Frustum
+public sealed class Frustum
 {
     private readonly Vector4[] _planes = new Vector4[6];
 
-    public Frustum(Matrix4 viewMatrix, Matrix4 projectionMatrix)
+    public void UpdateFrustum(Matrix4 viewMatrix, Matrix4 projectionMatrix)
     {
         var v = viewMatrix;
         var p = projectionMatrix;

@@ -4,7 +4,7 @@ using MinecraftLibrary.Engine.Blocks;
 
 namespace MinecraftClient.Render.World.Block;
 
-public class GrassBlockRenderer : BlockRenderer
+internal sealed class GrassBlockRenderer : BlockRenderer
 {
     public GrassBlockRenderer() : base(MinecraftLibrary.Engine.Blocks.Block.GetBlock(BlockType.Grass))
     {

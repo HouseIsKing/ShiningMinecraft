@@ -65,7 +65,8 @@ public sealed class PlayerRenderer(PlayerState player)
         {
             _selectionHighlightTessellator.SetVertex(world.GetBlockAt(p.HitPosition).Type, BuildLightBlock(p.HitPosition), p.HitPosition);
         }
-        _selectionHighlightTessellator.Draw(1);
+        _selectionHighlightTessellator.PrepareToDraw();
+        _selectionHighlightTessellator.Draw();
     }
 
     private static byte BuildLightBlock(Vector3i pos)

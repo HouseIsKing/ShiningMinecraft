@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using MinecraftLibrary.Engine;
 using MinecraftLibrary.Network;
 
 namespace MinecraftClient.Network;
@@ -17,10 +18,12 @@ public sealed class NetworkManager
     private readonly byte[] _packetBufferWrite = new byte[1024];
     private readonly ConcurrentQueue<Packet> _outgoingPackets = new();
     private Task _sendTask = Task.CompletedTask;
+    private readonly ConcurrentQueue<Packet> _availablePackets = new();
     private readonly ConcurrentQueue<Packet> _incomingPackets = new();
 
     public NetworkManager(IPAddress ipAddr, ushort port, string name)
     {
+        for (var i = 0; i < EngineDefaults.PacketHistorySize; i++) _availablePackets.Enqueue(new Packet(new PacketHeader(PacketType.WorldChange)));
         _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         _socket.NoDelay = true;
         _socket.ReceiveTimeout = 100;
@@ -67,8 +70,10 @@ public sealed class NetworkManager
         }
 
         _readCounter = 0;
-        var packet = new Packet(_headerRead,
-            new ArraySegment<byte>(_packetBuffer, 0, (int)_headerRead.Size));
+        var packet = GetNextAvailablePacket();
+        packet.Reset();
+        packet.Header = _headerRead;
+        packet.Write(new ArraySegment<byte>(_packetBuffer, 0, (int)_headerRead.Size));
         packet.Unpack();
         _incomingPackets.Enqueue(packet);
         t = _socket.ReceiveAsync(new ArraySegment<byte>(_packetBuffer, 0, 8));
@@ -121,8 +126,18 @@ public sealed class NetworkManager
     {
         _socket.Close();
     }
+    
+    private Packet GetNextAvailablePacket()
+    {
+        return _availablePackets.TryDequeue(out var packet) ? packet : new Packet(new PacketHeader(PacketType.WorldChange));
+    }
+    
+    public void ReturnPacket(Packet packet)
+    {
+        _availablePackets.Enqueue(packet);
+    }
 
-    public Packet GetNextIncomingPacket()
+    internal Packet GetNextIncomingPacket()
     {
         return _incomingPackets.TryDequeue(out var packet) ? packet : null;
     }

@@ -51,6 +51,13 @@ internal sealed class ServerManager
             newClient.SendPacket(packetToSend);
             _newlyJoinedClient = (state.EntityId, newClient);
         }
+        
+        var disconnectedClient = _networkManager.GetNextClientDisconnected();
+        if (disconnectedClient != null)
+        {
+            _world.DespawnPlayer(_players[disconnectedClient].State.EntityId);
+            _players.Remove(disconnectedClient);
+        }
 
         var incomingPacket = _networkManager.GetNextIncomingPacket();
         while (incomingPacket != null)
@@ -64,6 +71,7 @@ internal sealed class ServerManager
                     _players[client].AddInput(inputId, input);
                     break;
             }
+            _networkManager.ReturnPacket(packet);
             incomingPacket = _networkManager.GetNextIncomingPacket();
         }
     }

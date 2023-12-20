@@ -1,6 +1,8 @@
-﻿namespace MinecraftLibrary.Engine.Blocks;
+﻿using OpenTK.Mathematics;
 
-public sealed class AirBlock() : Block(BlockType.Air)
+namespace MinecraftLibrary.Engine.Blocks;
+
+public sealed class AirBlock() : Block(BlockType.Air, new Box3())
 {
     public override bool IsSolid()
     {

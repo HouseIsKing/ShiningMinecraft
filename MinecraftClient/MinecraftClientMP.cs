@@ -80,6 +80,7 @@ public sealed class MinecraftClientMp : MinecraftClient
             World.SerializeChangesToRevertPacket(_packetToRevert);
             WorldRenderer.ApplyTickChanges(_packetToRevert);
         }
+        _networkManager.ReturnPacket(packet);
         var timeTook = (float)Stopwatch.GetElapsedTime(start).TotalMilliseconds;
         Console.WriteLine($"Packet took {timeTook} ms");
     }

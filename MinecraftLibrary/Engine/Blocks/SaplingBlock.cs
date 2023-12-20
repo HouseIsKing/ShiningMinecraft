@@ -2,7 +2,7 @@
 
 namespace MinecraftLibrary.Engine.Blocks;
 
-public sealed class SaplingBlock() : Block(BlockType.Sapling)
+internal sealed class SaplingBlock() : Block(BlockType.Sapling)
 {
     public override void Tick(World world, Vector3i pos)
     {
@@ -12,5 +12,15 @@ public sealed class SaplingBlock() : Block(BlockType.Sapling)
             return;
 
         world.SetBlockAt(pos, BlockType.Air);
+    }
+
+    public override bool IsSolid()
+    {
+        return false;
+    }
+
+    public override bool IsBlockingLight()
+    {
+        return false;
     }
 }

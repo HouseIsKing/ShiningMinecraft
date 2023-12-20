@@ -1,6 +1,6 @@
 #version 460 core
 layout (points) in;
-layout (triangle_strip, max_vertices = 24) out;
+layout (triangle_strip, max_vertices = 12) out;
 
 struct Fog
 {
@@ -46,8 +46,9 @@ void main()
 {
     uint brightnessBits = (BlockType16_Brightness6a[0] >> 10) & 0x3F;
     uint blockType = BlockType16_Brightness6a[0] >> 16;
-    vec4 boundsMin = blocks[blockType].bounds[0];
-    vec4 boundsMax = blocks[blockType].bounds[1];
+    Block block = blocks[blockType];
+    vec4 boundsMin = block.bounds[0];
+    vec4 boundsMax = block.bounds[1];
     vec4 minusPos = transformationMatrices[chunkIndex[0]] * (gl_in[0].gl_Position + boundsMin);
     vec4 plusPos = transformationMatrices[chunkIndex[0]] * (gl_in[0].gl_Position + boundsMax);
     vec4 camPos = inverse(view)[3];
@@ -72,8 +73,8 @@ void main()
     if (minusPos.y > camPos.y)
     {
         brightness = (brightnessBits >> 1) & 0x1;
-        fragTextureIndex = blocks[blockType].indexTextures_Colors[1].x;
-        c = blocks[blockType].indexTextures_Colors[1].y;
+        fragTextureIndex = block.indexTextures_Colors[1].x;
+        c = block.indexTextures_Colors[1].y;
         basicColor = vec4((c >> 24) / 255.0F, (c >> 16 & 0xFF) / 255.0F, (c >> 8 & 0xFF) / 255.0F, (c & 0xFF) / 255.0F);
         fragColor = basicColor;
         gl_Position = view * vec4(minusPos.x, minusPos.y, minusPos.z, 1.0);
@@ -92,8 +93,8 @@ void main()
     else if (plusPos.y < camPos.y)
     {
         brightness = brightnessBits & 0x1;
-        fragTextureIndex = blocks[blockType].indexTextures_Colors[0].x;
-        c = blocks[blockType].indexTextures_Colors[0].y;
+        fragTextureIndex = block.indexTextures_Colors[0].x;
+        c = block.indexTextures_Colors[0].y;
         basicColor = vec4((c >> 24) / 255.0F, (c >> 16 & 0xFF) / 255.0F, (c >> 8 & 0xFF) / 255.0F, (c & 0xFF) / 255.0F);
         fragColor = basicColor;
         gl_Position = view * vec4(minusPos.x, plusPos.y, minusPos.z, 1.0);
@@ -112,8 +113,8 @@ void main()
     if (minusPos.x > camPos.x)
     {
         brightness = (brightnessBits >> 3) & 0x1;
-        fragTextureIndex = blocks[blockType].indexTextures_Colors[3].x;
-        c = blocks[blockType].indexTextures_Colors[3].y;
+        fragTextureIndex = block.indexTextures_Colors[3].x;
+        c = block.indexTextures_Colors[3].y;
         basicColor = vec4((c >> 24) / 255.0F, (c >> 16 & 0xFF) / 255.0F, (c >> 8 & 0xFF) / 255.0F, (c & 0xFF) / 255.0F);
         fragColor = basicColor;
         gl_Position = view * vec4(minusPos.x, minusPos.y, minusPos.z, 1.0);
@@ -132,8 +133,8 @@ void main()
     else if (plusPos.x < camPos.x)
     {
         brightness = (brightnessBits >> 2) & 0x1;
-        fragTextureIndex = blocks[blockType].indexTextures_Colors[2].x;
-        c = blocks[blockType].indexTextures_Colors[2].y;
+        fragTextureIndex = block.indexTextures_Colors[2].x;
+        c = block.indexTextures_Colors[2].y;
         basicColor = vec4((c >> 24) / 255.0F, (c >> 16 & 0xFF) / 255.0F, (c >> 8 & 0xFF) / 255.0F, (c & 0xFF) / 255.0F);
         fragColor = basicColor;
         gl_Position = view * vec4(plusPos.x, minusPos.y, minusPos.z, 1.0);
@@ -152,8 +153,8 @@ void main()
     if (minusPos.z > camPos.z)
     {
         brightness = brightnessBits >> 5;
-        fragTextureIndex = blocks[blockType].indexTextures_Colors[5].x;
-        c = blocks[blockType].indexTextures_Colors[5].y;
+        fragTextureIndex = block.indexTextures_Colors[5].x;
+        c = block.indexTextures_Colors[5].y;
         basicColor = vec4((c >> 24) / 255.0F, (c >> 16 & 0xFF) / 255.0F, (c >> 8 & 0xFF) / 255.0F, (c & 0xFF) / 255.0F);
         fragColor = basicColor;
         gl_Position = view * vec4(minusPos.x, minusPos.y, minusPos.z, 1.0);
@@ -172,8 +173,8 @@ void main()
     else if (plusPos.z < camPos.z)
     {
         brightness = (brightnessBits >> 4) & 0x1;
-        fragTextureIndex = blocks[blockType].indexTextures_Colors[4].x;
-        c = blocks[blockType].indexTextures_Colors[4].y;
+        fragTextureIndex = block.indexTextures_Colors[4].x;
+        c = block.indexTextures_Colors[4].y;
         basicColor = vec4((c >> 24) / 255.0F, (c >> 16 & 0xFF) / 255.0F, (c >> 8 & 0xFF) / 255.0F, (c & 0xFF) / 255.0F);
         fragColor = basicColor;
         gl_Position = view * vec4(minusPos.x, minusPos.y, plusPos.z, 1.0);

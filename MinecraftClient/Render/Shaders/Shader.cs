@@ -3,14 +3,17 @@ using OpenTK.Mathematics;
 
 namespace MinecraftClient.Render.Shaders;
 
-public class Shader
+internal sealed class Shader
 {
-    private Dictionary<string, int> Uniforms = new();
+    private readonly Dictionary<string, int> _uniforms = new();
     public int Program { get; }
+
+    internal static Shader NormalBlockShader { get; } = new("Render/Shaders/BlockShaders/NormalBlockVS.glsl", "Render/Shaders/BlockShaders/NormalBlockFS.glsl", "Render/Shaders/BlockShaders/NormalBlockGS.glsl");
+    internal static Shader CrossBlockShader { get; } = new("Render/Shaders/BlockShaders/CrossBlockVS.glsl", "Render/Shaders/BlockShaders/CrossBlockFS.glsl", "Render/Shaders/BlockShaders/CrossBlockGS.glsl");
+    internal static Shader SelectionHighlightAShader { get; } = new("Render/Shaders/MiscShaders/SelectionHighlightVS.glsl", "Render/Shaders/MiscShaders/SelectionHighlightFS.glsl", "Render/Shaders/MiscShaders/SelectionHighlightGS.glsl");
+    internal static Shader SelectionHighlightBShader { get; } = new("Render/Shaders/MiscShaders/SelectionHighlightModeVS.glsl", "Render/Shaders/MiscShaders/SelectionHighlightModeFS.glsl", "Render/Shaders/MiscShaders/SelectionHighlightModeGS.glsl");
     
-    public static Shader ChunkShader { get; } = new("Render/Shaders/ChunkVS.glsl", "Render/Shaders/ChunkFS.glsl", "Render/Shaders/ChunkGS.glsl");
-    public static Shader SelectionHighlightAShader { get; } = new("Render/Shaders/SelectionHighlightVS.glsl", "Render/Shaders/SelectionHighlightFS.glsl", "Render/Shaders/SelectionHighlightGS.glsl");
-    public static Shader SelectionHighlightBShader { get; } = new("Render/Shaders/SelectionHighlightModeVS.glsl", "Render/Shaders/SelectionHighlightModeFS.glsl", "Render/Shaders/SelectionHighlightModeGS.glsl");
+    internal static Shader PostFxShader { get; } = new("Render/Shaders/MiscShaders/PostEffectsVS.glsl", "Render/Shaders/MiscShaders/PostEffectsFS.glsl");
 
     private static void CompileShader(int shader)
     {
@@ -57,7 +60,7 @@ public class Shader
         for (var i = 0; i < uniformCount; i++)
         {
             var name = GL.GetActiveUniform(Program, i, out _, out _);
-            Uniforms.Add(name, GL.GetUniformLocation(Program, name));
+            _uniforms.Add(name, GL.GetUniformLocation(Program, name));
         }
     }
 
@@ -90,11 +93,11 @@ public class Shader
         for (var i = 0; i < uniformCount; i++)
         {
             var name = GL.GetActiveUniform(Program, i, out _, out _);
-            Uniforms.Add(name, GL.GetUniformLocation(Program, name));
+            _uniforms.Add(name, GL.GetUniformLocation(Program, name));
         }
     }
-    
-    public void Use()
+
+    internal void Use()
     {
         GL.UseProgram(Program);
     }
@@ -106,26 +109,26 @@ public class Shader
     
     public void SetInt(string name, int value)
     {
-        GL.Uniform1(Uniforms[name], value);
+        GL.Uniform1(_uniforms[name], value);
     }
     
     public void SetUnsignedInt(string name, uint value)
     {
-        GL.Uniform1(Uniforms[name], value);
+        GL.Uniform1(_uniforms[name], value);
     }
-    
-    public void SetFloat(string name, float value)
+
+    internal void SetFloat(string name, float value)
     {
-        GL.Uniform1(Uniforms[name], value);
+        GL.Uniform1(_uniforms[name], value);
     }
-    
-    public void SetVector3(string name, Vector3 value)
+
+    internal void SetVector3(string name, Vector3 value)
     {
-        GL.Uniform3(Uniforms[name], value);
+        GL.Uniform3(_uniforms[name], value);
     }
     
     public void SetMat4(string name, Matrix4 value)
     {
-        GL.UniformMatrix4(Uniforms[name], false, ref value);
+        GL.UniformMatrix4(_uniforms[name], false, ref value);
     }
 }

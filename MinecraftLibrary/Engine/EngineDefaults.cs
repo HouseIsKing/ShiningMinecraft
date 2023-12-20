@@ -173,4 +173,15 @@ public static class EngineDefaults
     public delegate void EntityRemovedHandler(ushort entityId);
 
     public delegate void StateChangedHandler();
+    
+    [StructLayout(LayoutKind.Explicit)]
+    public struct UInt32ToSingle
+    {
+        [FieldOffset(0)] public uint UInt32;
+        [FieldOffset(0)] public float Single;
+        [FieldOffset(0)] public byte Byte0;
+        [FieldOffset(1)] public byte Byte1;
+        [FieldOffset(2)] public byte Byte2;
+        [FieldOffset(3)] public byte Byte3;
+    }
 }

@@ -65,7 +65,7 @@ public sealed class Player(PlayerState state) : LivingEntity<PlayerState>(state)
                 HitPosition = right
                     ? new Vector3i((int)position.X, (int)position.Y, (int)position.Z)
                     : new Vector3i((int)position.X - 1, (int)position.Y, (int)position.Z);
-                if (!World.Instance.GetBlockAt(HitPosition).IsSolid()) continue;
+                if (World.Instance.GetBlockAt(HitPosition).Type == BlockType.Air) continue;
 
                 FoundBlock = true;
                 HitFace = right ? BlockFaces.West : BlockFaces.East;
@@ -81,7 +81,7 @@ public sealed class Player(PlayerState state) : LivingEntity<PlayerState>(state)
                 HitPosition = up
                     ? new Vector3i((int)position.X, (int)position.Y, (int)position.Z)
                     : new Vector3i((int)position.X, (int)position.Y - 1, (int)position.Z);
-                if (!World.Instance.GetBlockAt(HitPosition).IsSolid()) continue;
+                if (World.Instance.GetBlockAt(HitPosition).Type == BlockType.Air) continue;
 
                 FoundBlock = true;
                 HitFace = up ? BlockFaces.Bottom : BlockFaces.Top;
@@ -95,7 +95,8 @@ public sealed class Player(PlayerState state) : LivingEntity<PlayerState>(state)
             HitPosition = forward
                 ? new Vector3i((int)position.X, (int)position.Y, (int)position.Z)
                 : new Vector3i((int)position.X, (int)position.Y, (int)position.Z - 1);
-            if (!World.Instance.GetBlockAt(HitPosition).IsSolid()) continue;
+            var blockAtIntersection = World.Instance.GetBlockAt(HitPosition);
+            if (blockAtIntersection.Type == BlockType.Air) continue;
 
             FoundBlock = true;
             HitFace = forward ? BlockFaces.South : BlockFaces.North;

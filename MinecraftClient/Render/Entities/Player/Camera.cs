@@ -1,29 +1,32 @@
-﻿using OpenTK.Mathematics;
+﻿using MinecraftLibrary.Engine;
+using OpenTK.Mathematics;
 
 namespace MinecraftClient.Render.Entities.Player;
 
-public class Camera
+internal sealed class Camera
 {
-    private Vector3 Front;
-    private Vector3 Up;
-    private Vector3 Right;
-    private float Fov;
-    private float AspectRatio;
-    private Matrix4 ViewMatrix;
-    private Matrix4 ProjectionMatrix;
-    private bool IsDirtyProjectionMatrix;
-    private float PrevYaw;
-    private float PrevPitch;
-    private float ZNear;
-    private float ZFar;
+    private Vector3 _front;
+    private Vector3 _up;
+    private Vector3 _right;
+    private float _fov;
+    private float _aspectRatio;
+    private Matrix4 _viewMatrix;
+    private readonly byte[,,] _viewMatrixBytes = new byte[4, 4, 4];
+    private Matrix4 _projectionMatrix;
+    private readonly byte[,,] _projectionMatrixBytes = new byte[4, 4, 4];
+    private bool _isDirtyProjectionMatrix;
+    private readonly float _zNear;
+    private readonly float _zFar;
+    private readonly Frustum _frustum = new();
+    private EngineDefaults.UInt32ToSingle _converter;
 
-    public float Pitch;
-    public float Yaw;
-    public Vector3 Position;
+    internal float Pitch;
+    internal float Yaw;
+    internal Vector3 Position;
     
-    private static readonly Camera Instance = new Camera(new Vector3(0, 16.1f, 0), 1280.0f / 720.0f);
-    
-    public static Camera GetInstance()
+    private static readonly Camera Instance = new(new Vector3(0, 16.1f, 0), 1280.0f / 720.0f);
+
+    internal static Camera GetInstance()
     {
         return Instance;
     }
@@ -31,71 +34,98 @@ public class Camera
     private Camera(Vector3 position, float aspectRatio)
     {
         Position = position;
-        AspectRatio = aspectRatio;
-        Fov = 70;
-        ZNear = 0.05f;
-        ZFar = 1000;
-        IsDirtyProjectionMatrix = true;
-        PrevYaw = Yaw = 0;
-        PrevPitch = Pitch = 0;
+        _aspectRatio = aspectRatio;
+        _fov = 70;
+        _zNear = 0.05f;
+        _zFar = 1000;
+        _isDirtyProjectionMatrix = true;
+        Yaw = 0;
+        Pitch = 0;
         UpdateVectors();
     }
     
     private void UpdateVectors()
     {
-        Front.X = (float)(Math.Cos(MathHelper.DegreesToRadians(Yaw)) * Math.Cos(MathHelper.DegreesToRadians(Pitch)));
-        Front.Y = (float)Math.Sin(MathHelper.DegreesToRadians(Pitch));
-        Front.Z = (float)(Math.Sin(MathHelper.DegreesToRadians(Yaw)) * Math.Cos(MathHelper.DegreesToRadians(Pitch)));
-        Front = Vector3.Normalize(Front);
-        Right = Vector3.Normalize(Vector3.Cross(Front, Vector3.UnitY));
-        Up = Vector3.Normalize(Vector3.Cross(Right, Front));
+        _front.X = (float)(Math.Cos(MathHelper.DegreesToRadians(Yaw)) * Math.Cos(MathHelper.DegreesToRadians(Pitch)));
+        _front.Y = (float)Math.Sin(MathHelper.DegreesToRadians(Pitch));
+        _front.Z = (float)(Math.Sin(MathHelper.DegreesToRadians(Yaw)) * Math.Cos(MathHelper.DegreesToRadians(Pitch)));
+        _front = Vector3.Normalize(_front);
+        _right = Vector3.Normalize(Vector3.Cross(_front, Vector3.UnitY));
+        _up = Vector3.Normalize(Vector3.Cross(_right, _front));
     }
 
-    public Frustum GetFrustum()
+    internal Frustum GetFrustum()
     {
-        return new Frustum(ViewMatrix, ProjectionMatrix);
+        _frustum.UpdateFrustum(GetViewMatrix(), GetProjectionMatrix());
+        return _frustum;
     }
 
-    public void SetFov(float fov)
+    internal void SetFov(float fov)
     {
-        Fov = fov;
-        IsDirtyProjectionMatrix = true;
+        _fov = fov;
+        _isDirtyProjectionMatrix = true;
     }
 
     public Vector3 GetFrontVector()
     {
-        return Front;
+        return _front;
     }
-    
-    public Matrix4 GetViewMatrix()
+
+    internal Matrix4 GetViewMatrix()
     {
         RecalculateViewMatrix();
-        return ViewMatrix;
+        return _viewMatrix;
+    }
+    
+    internal byte[,,] GetViewMatrixBytes()
+    {
+        return _viewMatrixBytes;
+    }
+    
+    internal byte[,,] GetProjectionMatrixBytes()
+    {
+        return _projectionMatrixBytes;
     }
 
-    public Matrix4 GetProjectionMatrix()
+    internal Matrix4 GetProjectionMatrix()
     {
-        if (IsDirtyProjectionMatrix) RecalculateProjectionMatrix();
-        return ProjectionMatrix;
+        if (_isDirtyProjectionMatrix) RecalculateProjectionMatrix();
+        return _projectionMatrix;
     }
 
-    public void SetAspectRatio(float newAspectRatio)
+    internal void SetAspectRatio(float newAspectRatio)
     {
-        AspectRatio = newAspectRatio;
-        IsDirtyProjectionMatrix = true;
+        _aspectRatio = newAspectRatio;
+        _isDirtyProjectionMatrix = true;
     }
 
     private void RecalculateProjectionMatrix()
     {
-        ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(Fov), AspectRatio, ZNear, ZFar);
-        IsDirtyProjectionMatrix = false;
+        _projectionMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(_fov), _aspectRatio, _zNear, _zFar);
+        for (var i = 0; i < 4; i++)
+        for (var j = 0; j < 4; j++)
+        {
+            _converter.Single = _projectionMatrix[i, j];
+            _projectionMatrixBytes[i, j, 0] = _converter.Byte0;
+            _projectionMatrixBytes[i, j, 1] = _converter.Byte1;
+            _projectionMatrixBytes[i, j, 2] = _converter.Byte2;
+            _projectionMatrixBytes[i, j, 3] = _converter.Byte3;
+        }
+        _isDirtyProjectionMatrix = false;
     }
 
     private void RecalculateViewMatrix()
     {
-        PrevYaw = Yaw;
-        PrevPitch = Pitch;
         UpdateVectors();
-        ViewMatrix = Matrix4.LookAt(Position, Position + Front, Up);
+        _viewMatrix = Matrix4.LookAt(Position, Position + _front, _up);
+        for (var i = 0; i < 4; i++)
+        for (var j = 0; j < 4; j++)
+        {
+            _converter.Single = _viewMatrix[i, j];
+            _viewMatrixBytes[i, j, 0] = _converter.Byte0;
+            _viewMatrixBytes[i, j, 1] = _converter.Byte1;
+            _viewMatrixBytes[i, j, 2] = _converter.Byte2;
+            _viewMatrixBytes[i, j, 3] = _converter.Byte3;
+        }
     }
 }

@@ -1,24 +1,23 @@
-using System.Reflection.Metadata;
-using MinecraftClient.Render.Entities.Player;
+using MinecraftClient.Render.World.Block;
 using MinecraftLibrary.Engine;
-using MinecraftLibrary.Engine.Blocks;
 using MinecraftLibrary.Engine.States.World;
 using MinecraftLibrary.Network;
 using OpenTK.Mathematics;
 
 namespace MinecraftClient.Render.World;
 
-public sealed class ChunkRenderer
+internal sealed class ChunkRenderer
 {
     public ushort ChunkId { get; }
     private readonly ChunkState _state;
 
     private readonly HashSet<ushort> _dirtyVertexes =
         new(EngineDefaults.ChunkHeight * EngineDefaults.ChunkWidth * EngineDefaults.ChunkDepth);
-    private readonly List<uint> _triangles = new();
-    private GlDrawElementsIndirectCommand _command;
-    private byte[] drawCommand = new byte[20];
-    private Box3 _boundingBox;
+    private readonly List<uint> _triangles = [];
+    private readonly List<uint>[] _drawTriangles = new List<uint>[Enum.GetValues<DrawType>().Length];
+    private readonly GlDrawElementsIndirectCommand[] _commands = new GlDrawElementsIndirectCommand[Enum.GetValues<DrawType>().Length];
+    private readonly byte[][] _drawCommand = new byte[Enum.GetValues<DrawType>().Length][];
+    private readonly Box3 _boundingBox;
 
     private Vector3 Position { get; }
     private static Vector3 Rotation => Vector3.Zero;
@@ -30,17 +29,21 @@ public sealed class ChunkRenderer
     {
         ChunkId = id;
         _state = state;
-        WorldRenderer renderer = WorldRenderer.Instance;
-        Vector3i pos = new Vector3i(_state.X * EngineDefaults.ChunkWidth, _state.Y * EngineDefaults.ChunkHeight, _state.Z * EngineDefaults.ChunkDepth) + renderer.BaseVector;
+        var renderer = WorldRenderer.Instance;
+        var pos = new Vector3i(_state.X * EngineDefaults.ChunkWidth, _state.Y * EngineDefaults.ChunkHeight, _state.Z * EngineDefaults.ChunkDepth) + renderer.BaseVector;
         _boundingBox = new Box3(pos, pos + new Vector3i(EngineDefaults.ChunkWidth, EngineDefaults.ChunkHeight, EngineDefaults.ChunkDepth));
         Position = pos;
         for (ushort i = 0; i < EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth; i++) _dirtyVertexes.Add(i);
-        _command.instanceCount = 1;
-        _command.baseInstance = 0;
-        _command.baseVertex = (uint)(ChunkId * EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight *
-                                     EngineDefaults.ChunkDepth);
-        _command.count = 0;
-        _command.firstIndex = (uint)(ChunkId * EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth);
+        for (var i = 0; i < _drawCommand.Length; i++)
+        {
+            _commands[i].instanceCount = 1;
+            _commands[i].baseInstance = 0;
+            _commands[i].baseVertex = (uint)(ChunkId * EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth);
+            _commands[i].count = 0;
+            _commands[i].firstIndex = (uint)(ChunkId * EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth);
+            _drawCommand[i] = new byte[20];
+            _drawTriangles[i] = [];
+        }
     }
 
     public bool IsDirty()
@@ -60,8 +63,8 @@ public sealed class ChunkRenderer
         result |= (byte)(world.GetBrightnessAt(pos - Vector3i.UnitZ) << 5);
         return result;
     }
-    
-    public void NotifyBlockChange(ushort index)
+
+    private void NotifyBlockChange(ushort index)
     {
         _dirtyVertexes.Add(index);
     }
@@ -74,7 +77,7 @@ public sealed class ChunkRenderer
             packet.Read(out ushort index);
             packet.Read(out byte _);
             NotifyBlockChange(index);
-            WorldRenderer renderer = WorldRenderer.Instance;
+            var renderer = WorldRenderer.Instance;
             if (MinecraftLibrary.Engine.Blocks.Block.GetBlock(_state.GetBlockAt(index)).IsSolid()) continue;
             var helper = EngineDefaults.GetVectorFromIndex(index) + new Vector3i(_state.X * EngineDefaults.ChunkWidth,
                 _state.Y * EngineDefaults.ChunkHeight, _state.Z * EngineDefaults.ChunkDepth) + renderer.BaseVector;
@@ -95,11 +98,21 @@ public sealed class ChunkRenderer
 
     private void BuildTriangles(ChunkTessellator tessellator)
     {
+        foreach (var triangles in _drawTriangles) triangles.Clear();
         _triangles.Clear();
         for (ushort i = 0; i < EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth; i++)
-            if (_state.GetBlockAt(i) != BlockType.Air && ShouldDrawCube(i)) 
-                _triangles.Add(i);
-        _command.count = (uint)_triangles.Count;
+        {
+            var type = _state.GetBlockAt(i);
+            if (type == BlockType.Air || !ShouldDrawCube(i)) continue;
+            _drawTriangles[(byte)BlockRenderer.GetBlockRenderer(type).DrawType].Add(i);
+        }
+        _commands[0].count = (uint)_drawTriangles[0].Count;
+        for (var i = 1; i < _commands.Length; i++)
+        {
+            _commands[i].count = (uint)_drawTriangles[i].Count;
+            _commands[i].firstIndex = _commands[i - 1].firstIndex + _commands[i - 1].count;
+        }
+        foreach (var triangles in _drawTriangles) _triangles.AddRange(triangles);
         tessellator.SetTriangles(ChunkId, _triangles.ToArray());
     }
 
@@ -121,7 +134,7 @@ public sealed class ChunkRenderer
         foreach (var vertex in _dirtyVertexes) tessellator.SetVertex(ChunkId, vertex, _state.GetBlockAt(vertex), BuildLightByte(vertex));
         BuildTriangles(tessellator);
         _dirtyVertexes.Clear();
-        drawCommand = EngineDefaults.GetBytes(_command).ToArray();
+        for (var i = 0; i < _commands.Length; i++) _drawCommand[i] = EngineDefaults.GetBytes(_commands[i]).ToArray();
     }
 
     public void LightUpdateColumn(Vector2i pos)
@@ -134,9 +147,9 @@ public sealed class ChunkRenderer
         }
     }
 
-    public byte[] GetDrawCommand()
+    public byte[] GetDrawCommand(DrawType type)
     {
-        return drawCommand;
+        return _drawCommand[(byte)type];
     }
 
     public Box3 GetBoundingBox()

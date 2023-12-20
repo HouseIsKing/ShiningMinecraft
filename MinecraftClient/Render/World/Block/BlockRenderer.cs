@@ -1,4 +1,5 @@
 using MinecraftClient.Render.Textures;
+using MinecraftLibrary.Engine;
 using MinecraftLibrary.Engine.Blocks;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
@@ -8,18 +9,20 @@ namespace MinecraftClient.Render.World.Block;
 
 public abstract class BlockRenderer(MinecraftLibrary.Engine.Blocks.Block block)
 {
-    private static readonly BlockRenderer[] BlockRenderers = { new AirBlockRenderer(), new GrassBlockRenderer(), new DirtBlockRenderer(), new CobblestoneBlockRenderer(), new StoneBlockRenderer() };
+    private static readonly BlockRenderer[] BlockRenderers = new BlockRenderer[Enum.GetValues<BlockType>().Length];
     
-    protected List<Texture> Textures { get; } = new();
+    protected List<Texture> Textures { get; } = [];
     private readonly MinecraftLibrary.Engine.Blocks.Block _block = block;
     private static int _ssbo;
     private static readonly byte[] SsboData;
     private const float XSideShade = 0.6F;
     private const float YSideShade = 1.0F;
     private const float ZSideShade = 0.8F;
+    public DrawType DrawType { get; protected set; } = DrawType.Normal;
 
     static BlockRenderer()
     {
+        GenerateBlockRenderers();
         SsboData = new byte[(2 * 16 + 6 * 16) * BlockRenderers.Length];
         var offset = 0;
         foreach (var blockRender in BlockRenderers)
@@ -44,6 +47,21 @@ public abstract class BlockRenderer(MinecraftLibrary.Engine.Blocks.Block block)
             Buffer.BlockCopy(textureIndexes, 0, SsboData, offset, 16 * 6);
             offset += 16 * 6;
         }
+    }
+
+    private static void GenerateBlockRenderers()
+    {
+        foreach (var type in Enum.GetValues<BlockType>())
+            BlockRenderers[(int)type] = type switch
+            {
+                BlockType.Cobblestone => new CobblestoneBlockRenderer(),
+                BlockType.Dirt => new DirtBlockRenderer(),
+                BlockType.Grass => new GrassBlockRenderer(),
+                BlockType.Stone => new StoneBlockRenderer(),
+                BlockType.Planks => new PlanksBlockRenderer(),
+                BlockType.Sapling => new SaplingBlockRenderer(),
+                _ => new AirBlockRenderer()
+            };
     }
 
     protected abstract uint GetIndexTexture(BlockFaces face);
@@ -106,8 +124,8 @@ public abstract class BlockRenderer(MinecraftLibrary.Engine.Blocks.Block block)
         return (uint)((r << 24) | (g << 16) | (b << 8) | a);
     }
 
-    protected virtual uint GetSpecialFactor()
+    public static BlockRenderer GetBlockRenderer(BlockType type)
     {
-        return 0;
+        return BlockRenderers[(int)type];
     }
 }

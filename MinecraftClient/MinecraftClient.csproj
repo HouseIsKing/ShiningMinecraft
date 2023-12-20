@@ -21,12 +21,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <None Update="Render\Shaders\ChunkFS.glsl">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="Render\Shaders\ChunkVS.glsl">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
       <None Update="Render\Textures\Cobblestone.dds">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
@@ -45,27 +39,56 @@
       <None Update="Render\Textures\Dirt.dds">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\ChunkGS.glsl">
+      <None Update="Render\Shaders\BlockShaders\NormalBlockVS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\SelectionHighlightVS.glsl">
+      <None Update="Render\Shaders\BlockShaders\NormalBlockGS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\SelectionHighlightGS.glsl">
+      <None Update="Render\Shaders\BlockShaders\NormalBlockFS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\SelectionHighlightFS.glsl">
+      <None Update="Render\Shaders\MiscShaders\SelectionHighlightGS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\SelectionHighlightModeFS.glsl">
+      <None Update="Render\Shaders\MiscShaders\SelectionHighlightFS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\SelectionHighlightModeGS.glsl">
+      <None Update="Render\Shaders\MiscShaders\SelectionHighlightVS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Render\Shaders\SelectionHighlightModeVS.glsl">
+      <None Update="Render\Shaders\MiscShaders\SelectionHighlightModeVS.glsl">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
+      <None Update="Render\Shaders\MiscShaders\SelectionHighlightModeFS.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\MiscShaders\SelectionHighlightModeGS.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\BlockShaders\CrossBlockFS.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\BlockShaders\CrossBlockGS.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\BlockShaders\CrossBlockVS.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Textures\Sapling.dds">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\MiscShaders\PostEffectsFS.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="Render\Shaders\MiscShaders\PostEffectsVS.glsl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Render\Shaders\EntitiesShaders\" />
+      <Folder Include="Render\Shaders\GUIShaders\" />
     </ItemGroup>
 
 </Project>

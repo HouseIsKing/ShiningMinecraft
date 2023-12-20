@@ -39,14 +39,16 @@ public abstract class MinecraftClient : GameWindow
         World = world;
         World.OnTickStart += PreTick;
         World.OnTickEnd += PostTick;
-        WorldRenderer = new WorldRenderer(new PlayerRenderer(null));
+        WorldRenderer = new WorldRenderer(new PlayerRenderer(null), 1280, 720);
         GL.DebugMessageCallback(HandleDebug, IntPtr.Zero);
         GLFW.SetErrorCallback(HandleError);
         CursorState = CursorState.Grabbed;
         GL.ClearColor(0.5f, 0.8f, 1.0f, 1.0f);
-        GL.ClearDepth(1.0f);
+        GL.ClearDepth(1.1f);
         GL.DepthFunc(DepthFunction.Lequal);
         GL.Enable(EnableCap.DepthTest);
+        GL.Enable(EnableCap.Multisample);
+        //GL.Enable(EnableCap.Blend);
         GL.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
         GL.Enable(EnableCap.CullFace);
     }
@@ -100,11 +102,10 @@ public abstract class MinecraftClient : GameWindow
     protected override void OnRenderFrame(FrameEventArgs args)
     {
         base.OnRenderFrame(args);
-        GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         WorldRenderer.Render((float)Ticker / EngineDefaults.TickRate);
         SwapBuffers();
         var timeTook = Stopwatch.GetElapsedTime(_startTickTime).TotalMilliseconds;
-        Console.WriteLine($"Render took {timeTook} ms");
+        if (timeTook > 5) Console.WriteLine($"Render took {timeTook} ms");
         var timer = Stopwatch.GetTimestamp();
         Ticker += new TimeSpan(timer - _startTickTime).TotalSeconds;
         _startTickTime = timer;

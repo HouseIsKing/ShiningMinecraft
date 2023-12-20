@@ -1,5 +1,4 @@
 using OpenTK.Graphics.OpenGL4;
-using OpenTK.Mathematics;
 
 namespace MinecraftClient.Render;
 
@@ -30,9 +29,11 @@ public abstract class Tessellator
         GL.DeleteBuffer(DrawElementsIndirectCommandsBuffer);
     }
 
-    internal virtual void Draw(ushort commandsCount)
+    internal void PrepareToDraw()
     {
         GL.BindVertexArray(Vao);
         GL.BindBuffer(BufferTarget.DrawIndirectBuffer, DrawElementsIndirectCommandsBuffer);
     }
+
+    internal abstract void Draw();
 }
