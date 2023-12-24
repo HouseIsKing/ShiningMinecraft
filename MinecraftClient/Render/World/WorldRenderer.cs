@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using MinecraftClient.Render.Entities.Player;
 using MinecraftClient.Render.Shaders;
@@ -19,7 +20,8 @@ public sealed class WorldRenderer
     private uint _msColorRenderBuffer;
     private uint _msDepthRenderBuffer;
     private readonly uint _fbo;
-    private uint _framebufferColorTexture;
+    private uint _frameBufferColorTexture;
+    private uint _frameBufferDepthTexture;
     private Vector2i _screenSize;
     private uint _fogsBuffer;
     private uint _worldInfoBuffer;
@@ -38,17 +40,17 @@ public sealed class WorldRenderer
     internal Vector3i BaseVector { get; } = MinecraftLibrary.Engine.World.Instance.GetBaseVector();
     internal static WorldRenderer Instance { get; private set; }
 
-    private void InitWorldFramebuffer(int width, int height)
+    private void InitWorldFrameBuffer(int width, int height)
     {
         _screenSize = new Vector2i(width, height);
         float[] quadVertices =
-        {
+        [
             // positions        // texture Coords
             -1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
             -1.0f, -1.0f, 1.0f, 0.0f, 0.0f,
             1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-            1.0f, -1.0f, 1.0f, 1.0f, 0.0f,
-        };
+            1.0f, -1.0f, 1.0f, 1.0f, 0.0f
+        ];
         GL.NamedBufferStorage(_vbo, 4 * 5 * sizeof(float), quadVertices, BufferStorageFlags.None);
         GL.VertexArrayVertexBuffer(_vao, 0, _vbo, IntPtr.Zero, 5 * sizeof(float));
         GL.VertexArrayAttribFormat(_vao, 0, 3, VertexAttribType.Float, false, 0);
@@ -64,10 +66,12 @@ public sealed class WorldRenderer
         GL.NamedRenderbufferStorageMultisample(_msDepthRenderBuffer, 4, RenderbufferStorage.DepthComponent32, width, height);
         GL.NamedFramebufferRenderbuffer(_msFbo, FramebufferAttachment.ColorAttachment0, RenderbufferTarget.Renderbuffer, _msColorRenderBuffer);
         GL.NamedFramebufferRenderbuffer(_msFbo, FramebufferAttachment.DepthAttachment, RenderbufferTarget.Renderbuffer, _msDepthRenderBuffer);
-        GL.CreateTextures(TextureTarget.Texture2D, 1, out _framebufferColorTexture);
-        GL.TextureStorage2D(_framebufferColorTexture, 1, SizedInternalFormat.Rgba16f, width, height);
-        GL.NamedFramebufferTexture(_fbo, FramebufferAttachment.ColorAttachment0, _framebufferColorTexture, 0);
-        GL.CheckNamedFramebufferStatus(_msFbo, FramebufferTarget.Framebuffer);
+        GL.CreateTextures(TextureTarget.Texture2D, 1, out _frameBufferColorTexture);
+        GL.TextureStorage2D(_frameBufferColorTexture, 1, SizedInternalFormat.Rgba16f, width, height);
+        GL.CreateTextures(TextureTarget.Texture2D, 1, out _frameBufferDepthTexture);
+        GL.TextureStorage2D(_frameBufferDepthTexture, 1, SizedInternalFormat.DepthComponent32, width, height);
+        GL.NamedFramebufferTexture(_fbo, FramebufferAttachment.ColorAttachment0, _frameBufferColorTexture, 0);
+        GL.NamedFramebufferTexture(_fbo, FramebufferAttachment.DepthAttachment, _frameBufferDepthTexture, 0);
     }
     
     private void InitFog()
@@ -136,7 +140,7 @@ public sealed class WorldRenderer
         GL.CreateBuffers(1, out _vbo);
         GL.CreateFramebuffers(1, out _fbo);
         GL.CreateFramebuffers(1, out _msFbo);
-        InitWorldFramebuffer(width, height);
+        InitWorldFrameBuffer(width, height);
     }
 
     ~WorldRenderer()
@@ -150,7 +154,8 @@ public sealed class WorldRenderer
         GL.DeleteBuffer(_cameraInfoBuffer);
         GL.DeleteBuffer(_vbo);
         GL.DeleteVertexArray(_vao);
-        GL.DeleteTexture(_framebufferColorTexture);
+        GL.DeleteTexture(_frameBufferDepthTexture);
+        GL.DeleteTexture(_frameBufferColorTexture);
         GL.DeleteRenderbuffer(_msDepthRenderBuffer);
         GL.DeleteRenderbuffer(_msColorRenderBuffer);
         GL.DeleteFramebuffer(_msFbo);
@@ -168,7 +173,7 @@ public sealed class WorldRenderer
         _screenSize.X = width;
         _screenSize.Y = height;
         Camera.GetInstance().SetAspectRatio((float)width / height);
-        GL.DeleteTexture(_framebufferColorTexture);
+        GL.DeleteTexture(_frameBufferColorTexture);
         GL.DeleteRenderbuffer(_msDepthRenderBuffer);
         GL.DeleteRenderbuffer(_msColorRenderBuffer);
         GL.CreateRenderbuffers(1, out _msColorRenderBuffer);
@@ -177,9 +182,12 @@ public sealed class WorldRenderer
         GL.NamedRenderbufferStorageMultisample(_msDepthRenderBuffer, 4, RenderbufferStorage.DepthComponent32, width, height);
         GL.NamedFramebufferRenderbuffer(_msFbo, FramebufferAttachment.ColorAttachment0, RenderbufferTarget.Renderbuffer, _msColorRenderBuffer);
         GL.NamedFramebufferRenderbuffer(_msFbo, FramebufferAttachment.DepthAttachment, RenderbufferTarget.Renderbuffer, _msDepthRenderBuffer);
-        GL.CreateTextures(TextureTarget.Texture2D, 1, out _framebufferColorTexture);
-        GL.TextureStorage2D(_framebufferColorTexture, 1, SizedInternalFormat.Rgba16f, width, height);
-        GL.NamedFramebufferTexture(_fbo, FramebufferAttachment.ColorAttachment0, _framebufferColorTexture, 0);
+        GL.CreateTextures(TextureTarget.Texture2D, 1, out _frameBufferColorTexture);
+        GL.TextureStorage2D(_frameBufferColorTexture, 1, SizedInternalFormat.Rgba16f, width, height);
+        GL.CreateTextures(TextureTarget.Texture2D, 1, out _frameBufferDepthTexture);
+        GL.TextureStorage2D(_frameBufferDepthTexture, 1, SizedInternalFormat.DepthComponent32, width, height);
+        GL.NamedFramebufferTexture(_fbo, FramebufferAttachment.ColorAttachment0, _frameBufferColorTexture, 0);
+        GL.NamedFramebufferTexture(_fbo, FramebufferAttachment.DepthAttachment, _frameBufferDepthTexture, 0);
     }
 
     internal void Render(float delta)
@@ -204,14 +212,15 @@ public sealed class WorldRenderer
 
     private void RenderPostProcessingEffects()
     {
-        GL.Disable(EnableCap.DepthTest);
         Shader.PostFxShader.Use();
-        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _msFbo);
-        GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _fbo);
-        GL.BlitFramebuffer(0, 0, _screenSize.X, _screenSize.Y, 0, 0, _screenSize.X, _screenSize.Y, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+        GL.BlitNamedFramebuffer(_msFbo, _fbo, 0, 0, _screenSize.X, _screenSize.Y, 0, 0, _screenSize.X, _screenSize.Y, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+        GL.BlitNamedFramebuffer(_msFbo, _fbo, 0, 0, _screenSize.X, _screenSize.Y, 0, 0, _screenSize.X, _screenSize.Y, ClearBufferMask.DepthBufferBit, BlitFramebufferFilter.Nearest);
+        GL.Disable(EnableCap.DepthTest);
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         GL.ActiveTexture(TextureUnit.Texture0);
-        GL.BindTexture(TextureTarget.Texture2D, _framebufferColorTexture);
+        GL.BindTexture(TextureTarget.Texture2D, _frameBufferColorTexture);
+        GL.ActiveTexture(TextureUnit.Texture1);
+        GL.BindTexture(TextureTarget.Texture2D, _frameBufferDepthTexture);
         GL.BindVertexArray(_vao);
         GL.DrawArrays(PrimitiveType.TriangleStrip, 0, 4);
     }

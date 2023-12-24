@@ -20,11 +20,11 @@ internal sealed class SelectionHighlightTessellator : Tessellator
         GL.VertexArrayAttribBinding(Vao, 0, 0);
         GlDrawElementsIndirectCommand command = new()
         {
-            baseInstance = 0,
-            count = 1,
-            instanceCount = 1,
-            firstIndex = 0,
-            baseVertex = 0
+            BaseInstance = 0,
+            Count = 1,
+            InstanceCount = 1,
+            FirstIndex = 0,
+            BaseVertex = 0
         };
         GL.NamedBufferStorage(DrawElementsIndirectCommandsBuffer, Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
             ref command, BufferStorageFlags.None);

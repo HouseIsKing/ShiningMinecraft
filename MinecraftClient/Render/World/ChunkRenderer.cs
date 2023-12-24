@@ -36,11 +36,11 @@ internal sealed class ChunkRenderer
         for (ushort i = 0; i < EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth; i++) _dirtyVertexes.Add(i);
         for (var i = 0; i < _drawCommand.Length; i++)
         {
-            _commands[i].instanceCount = 1;
-            _commands[i].baseInstance = 0;
-            _commands[i].baseVertex = (uint)(ChunkId * EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth);
-            _commands[i].count = 0;
-            _commands[i].firstIndex = (uint)(ChunkId * EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth);
+            _commands[i].InstanceCount = 1;
+            _commands[i].BaseInstance = 0;
+            _commands[i].BaseVertex = (uint)(ChunkId * EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth);
+            _commands[i].Count = 0;
+            _commands[i].FirstIndex = (uint)(ChunkId * EngineDefaults.ChunkWidth * EngineDefaults.ChunkHeight * EngineDefaults.ChunkDepth);
             _drawCommand[i] = new byte[20];
             _drawTriangles[i] = [];
         }
@@ -106,11 +106,11 @@ internal sealed class ChunkRenderer
             if (type == BlockType.Air || !ShouldDrawCube(i)) continue;
             _drawTriangles[(byte)BlockRenderer.GetBlockRenderer(type).DrawType].Add(i);
         }
-        _commands[0].count = (uint)_drawTriangles[0].Count;
+        _commands[0].Count = (uint)_drawTriangles[0].Count;
         for (var i = 1; i < _commands.Length; i++)
         {
-            _commands[i].count = (uint)_drawTriangles[i].Count;
-            _commands[i].firstIndex = _commands[i - 1].firstIndex + _commands[i - 1].count;
+            _commands[i].Count = (uint)_drawTriangles[i].Count;
+            _commands[i].FirstIndex = _commands[i - 1].FirstIndex + _commands[i - 1].Count;
         }
         foreach (var triangles in _drawTriangles) _triangles.AddRange(triangles);
         tessellator.SetTriangles(ChunkId, _triangles.ToArray());

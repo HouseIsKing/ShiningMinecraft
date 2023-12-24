@@ -68,7 +68,7 @@ internal sealed class ChunkTessellator : Tessellator
         Marshal.Copy((int[])(object)triangles, 0, _eboPointer + offset, triangles.Length);
     }
 
-    internal static void ChangeDrawType(DrawType type)
+    private static void ChangeDrawType(DrawType type)
     {
         switch (type)
         {
@@ -114,5 +114,11 @@ internal sealed class ChunkTessellator : Tessellator
             _drawElementsIndirectCommandsPointer + (byte)type * _drawElementsSize + _drawCommandCount[(byte)type] * Marshal.SizeOf<GlDrawElementsIndirectCommand>(),
             Marshal.SizeOf<GlDrawElementsIndirectCommand>());
         _drawCommandCount[(byte)type]++;
+    }
+
+    internal override void PrepareToDraw()
+    {
+        GL.Finish();
+        base.PrepareToDraw();
     }
 }

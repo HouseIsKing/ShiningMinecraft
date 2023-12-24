@@ -29,7 +29,7 @@ public abstract class Tessellator
         GL.DeleteBuffer(DrawElementsIndirectCommandsBuffer);
     }
 
-    internal void PrepareToDraw()
+    internal virtual void PrepareToDraw()
     {
         GL.BindVertexArray(Vao);
         GL.BindBuffer(BufferTarget.DrawIndirectBuffer, DrawElementsIndirectCommandsBuffer);

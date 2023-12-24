@@ -2,11 +2,11 @@
 
 public struct GlDrawElementsIndirectCommand
 { 
-    public uint count = 0;
-    public uint instanceCount = 1;
-    public uint firstIndex = 0;
-    public uint baseVertex = 0;
-    public uint baseInstance = 0;
+    public uint Count = 0;
+    public uint InstanceCount = 1;
+    public uint FirstIndex = 0;
+    public uint BaseVertex = 0;
+    public uint BaseInstance = 0;
 
     public GlDrawElementsIndirectCommand()
     {
